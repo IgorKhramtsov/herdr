@@ -420,7 +420,7 @@ mod tests {
     use super::*;
     use crate::integration::bundled_integration_files;
     use crate::integration::layout::IntegrationContext;
-    use crate::{integration_spec, integration_targets, IntegrationTarget};
+    use crate::{grok_hook_config, integration_spec, integration_targets, IntegrationTarget};
     use std::collections::BTreeSet;
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1039,7 +1039,7 @@ printf '%s' "$pane_id"
         fs::write(&config_path, foreign).unwrap();
 
         let err = install_integration(&ctx, IntegrationTarget::Grok, false).unwrap_err();
-        assert!(err.to_string().contains("modified"));
+        assert!(err.to_string().contains("unowned"));
         assert_eq!(fs::read(&config_path).unwrap(), foreign);
         assert!(!layout.files[0].path.exists());
 
@@ -1058,6 +1058,25 @@ printf '%s' "$pane_id"
         );
 
         uninstall_integration(&ctx, IntegrationTarget::Grok, true).unwrap();
+        assert!(!layout.files[0].path.exists());
+        assert!(!config_path.exists());
+
+        let mut stale = grok_hook_config(&layout.files[0].path);
+        stale["hooks"]["SessionStart"][0]["hooks"][0]["timeout"] = serde_json::json!(99);
+        fs::write(&config_path, serde_json::to_vec(&stale).unwrap()).unwrap();
+        assert_eq!(
+            integration_status(&ctx, IntegrationTarget::Grok)
+                .unwrap()
+                .host[0]
+                .state,
+            IntegrationFileState::Outdated
+        );
+        install_integration(&ctx, IntegrationTarget::Grok, false).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&config_path).unwrap()).unwrap(),
+            grok_hook_config(&layout.files[0].path)
+        );
+        uninstall_integration(&ctx, IntegrationTarget::Grok, false).unwrap();
         assert!(!layout.files[0].path.exists());
         assert!(!config_path.exists());
         fs::remove_dir_all(home).ok();

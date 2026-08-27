@@ -1073,11 +1073,48 @@ fn grok_status(path: &Path, hook_path: &Path) -> IntegrationFileStatus {
     let expected = grok_hook_config(hook_path);
     if value == expected {
         current(path)
-    } else if value.get("hooks").is_some() {
+    } else if grok_managed_shape(&value, hook_path) {
+        outdated(path)
+    } else if content.contains(&grok_hook_command(hook_path)) {
         modified(path)
     } else {
         unowned(path)
     }
+}
+
+fn grok_managed_shape(value: &Value, hook_path: &Path) -> bool {
+    let Some(root) = value.as_object().filter(|root| root.len() == 1) else {
+        return false;
+    };
+    let Some(hooks) = root
+        .get("hooks")
+        .and_then(Value::as_object)
+        .filter(|hooks| hooks.len() == 1)
+    else {
+        return false;
+    };
+    let Some(session) = hooks
+        .get("SessionStart")
+        .and_then(Value::as_array)
+        .filter(|sessions| sessions.len() == 1)
+        .and_then(|sessions| sessions.first())
+        .and_then(Value::as_object)
+        .filter(|session| session.len() == 1)
+    else {
+        return false;
+    };
+    let Some(hook) = session
+        .get("hooks")
+        .and_then(Value::as_array)
+        .filter(|hooks| hooks.len() == 1)
+        .and_then(|hooks| hooks.first())
+        .and_then(Value::as_object)
+    else {
+        return false;
+    };
+    hook.keys()
+        .all(|key| matches!(key.as_str(), "type" | "command" | "timeout"))
+        && hook.get("command").and_then(Value::as_str) == Some(&grok_hook_command(hook_path))
 }
 
 fn kimi_status(path: &Path, hook_path: &Path) -> IntegrationFileStatus {
@@ -1257,7 +1294,6 @@ fn missing(path: &Path) -> IntegrationFileStatus {
 fn outdated(path: &Path) -> IntegrationFileStatus {
     status(path, IntegrationFileState::Outdated)
 }
-
 fn modified(path: &Path) -> IntegrationFileStatus {
     status(path, IntegrationFileState::Modified)
 }

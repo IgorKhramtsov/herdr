@@ -302,16 +302,10 @@ where
     {
         return IntegrationFileState::Current;
     }
-    if states
-        .iter()
-        .any(|state| *state == IntegrationFileState::Unowned)
-    {
+    if states.contains(&IntegrationFileState::Unowned) {
         return IntegrationFileState::Unowned;
     }
-    if states
-        .iter()
-        .any(|state| *state == IntegrationFileState::Modified)
-    {
+    if states.contains(&IntegrationFileState::Modified) {
         return IntegrationFileState::Modified;
     }
     IntegrationFileState::Outdated
@@ -886,6 +880,187 @@ printf '%s' "$pane_id"
 
             fs::remove_dir_all(home).ok();
         }
+    }
+
+    #[test]
+    fn shared_json_host_mutations_preserve_foreign_config() {
+        let cases = [
+            (
+                IntegrationTarget::Devin,
+                "config.json",
+                serde_json::json!({
+                    "user": "keep",
+                    "hooks": {"Foreign": [{"hooks": [{"type": "command", "command": "echo keep"}]}]}
+                }),
+                "/hooks/Foreign",
+            ),
+            (
+                IntegrationTarget::Copilot,
+                "settings.json",
+                serde_json::json!({
+                    "user": "keep",
+                    "hooks": {"Foreign": [{"type": "command", "bash": "echo keep"}]}
+                }),
+                "/hooks/Foreign",
+            ),
+            (
+                IntegrationTarget::Cursor,
+                "hooks.json",
+                serde_json::json!({
+                    "user": "keep",
+                    "hooks": {"foreign": [{"command": "echo keep"}]}
+                }),
+                "/hooks/foreign",
+            ),
+            (
+                IntegrationTarget::Mastracode,
+                "hooks.json",
+                serde_json::json!({
+                    "user": "keep",
+                    "foreign": [{"type": "command", "command": "echo keep"}]
+                }),
+                "/foreign",
+            ),
+            (
+                IntegrationTarget::AntigravityCli,
+                "hooks.json",
+                serde_json::json!({
+                    "user": "keep",
+                    "foreign": {"command": "echo keep"}
+                }),
+                "/foreign",
+            ),
+        ];
+
+        for (target, name, seed, foreign_pointer) in cases {
+            let home = unique_home();
+            let ctx = test_ctx(&home);
+            let layout = integration_layout(&ctx, target).unwrap();
+            fs::create_dir_all(&layout.root).unwrap();
+            let host_path = layout.root.join(name);
+            fs::write(&host_path, serde_json::to_vec(&seed).unwrap()).unwrap();
+            let expected_foreign = seed.pointer(foreign_pointer).unwrap().clone();
+
+            install_integration(&ctx, target, false).unwrap();
+            let installed: serde_json::Value =
+                serde_json::from_slice(&fs::read(&host_path).unwrap()).unwrap();
+            assert_eq!(installed["user"], "keep", "{target:?}");
+            assert_eq!(
+                installed.pointer(foreign_pointer),
+                Some(&expected_foreign),
+                "{target:?}"
+            );
+
+            uninstall_integration(&ctx, target, false).unwrap();
+            let uninstalled: serde_json::Value =
+                serde_json::from_slice(&fs::read(&host_path).unwrap()).unwrap();
+            assert_eq!(uninstalled["user"], "keep", "{target:?}");
+            assert_eq!(
+                uninstalled.pointer(foreign_pointer),
+                Some(&expected_foreign),
+                "{target:?}"
+            );
+            assert!(
+                !uninstalled.to_string().contains("herdr-agent-state"),
+                "{target:?}"
+            );
+            fs::remove_dir_all(home).ok();
+        }
+    }
+
+    #[test]
+    fn text_host_mutations_preserve_foreign_config() {
+        let cases = [
+            (
+                IntegrationTarget::Codex,
+                "config.toml",
+                "model = \"keep\"\n",
+                "model = \"keep\"",
+            ),
+            (
+                IntegrationTarget::Kimi,
+                "config.toml",
+                "model = \"keep\"\n[custom]\nvalue = 1\n",
+                "[custom]\nvalue = 1",
+            ),
+            (
+                IntegrationTarget::Hermes,
+                "config.yaml",
+                "theme: dark\nplugins:\n  - custom\n",
+                "  - custom",
+            ),
+        ];
+
+        for (target, name, seed, preserved) in cases {
+            let home = unique_home();
+            let ctx = test_ctx(&home);
+            let layout = integration_layout(&ctx, target).unwrap();
+            fs::create_dir_all(&layout.root).unwrap();
+            let host_path = layout.root.join(name);
+            fs::write(&host_path, seed).unwrap();
+
+            install_integration(&ctx, target, false).unwrap();
+            assert!(
+                fs::read_to_string(&host_path).unwrap().contains(preserved),
+                "{target:?}"
+            );
+            uninstall_integration(&ctx, target, false).unwrap();
+            let uninstalled = fs::read_to_string(&host_path).unwrap();
+            assert!(uninstalled.contains(preserved), "{target:?}");
+            assert!(!uninstalled.contains("herdr-agent-state"), "{target:?}");
+            fs::remove_dir_all(home).ok();
+        }
+    }
+
+    #[test]
+    fn protected_host_config_requires_force_without_partial_mutation() {
+        let home = unique_home();
+        let ctx = test_ctx(&home);
+        let layout = integration_layout(&ctx, IntegrationTarget::Qwen).unwrap();
+        fs::create_dir_all(&layout.root).unwrap();
+        let settings_path = layout.root.join("settings.json");
+        fs::write(&settings_path, b"{ malformed").unwrap();
+
+        let err = install_integration(&ctx, IntegrationTarget::Qwen, false).unwrap_err();
+        assert!(err.to_string().contains("unowned"));
+        assert_eq!(fs::read(&settings_path).unwrap(), b"{ malformed");
+        assert!(!layout.files[0].path.exists());
+        fs::remove_dir_all(home).ok();
+    }
+
+    #[test]
+    fn grok_foreign_config_requires_force_for_install_and_uninstall() {
+        let home = unique_home();
+        let ctx = test_ctx(&home);
+        let layout = integration_layout(&ctx, IntegrationTarget::Grok).unwrap();
+        let config_path = layout.root.join("hooks").join("herdr.json");
+        fs::create_dir_all(config_path.parent().unwrap()).unwrap();
+        let foreign = br#"{"hooks":{"Custom":[]},"owner":"user"}"#;
+        fs::write(&config_path, foreign).unwrap();
+
+        let err = install_integration(&ctx, IntegrationTarget::Grok, false).unwrap_err();
+        assert!(err.to_string().contains("modified"));
+        assert_eq!(fs::read(&config_path).unwrap(), foreign);
+        assert!(!layout.files[0].path.exists());
+
+        install_integration(&ctx, IntegrationTarget::Grok, true).unwrap();
+        let mut modified: serde_json::Value =
+            serde_json::from_slice(&fs::read(&config_path).unwrap()).unwrap();
+        modified["owner"] = serde_json::json!("user");
+        fs::write(&config_path, serde_json::to_vec(&modified).unwrap()).unwrap();
+        let err = uninstall_integration(&ctx, IntegrationTarget::Grok, false).unwrap_err();
+        assert!(err.to_string().contains("modified"));
+        assert!(layout.files[0].path.exists());
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(&config_path).unwrap()).unwrap()
+                ["owner"],
+            "user"
+        );
+
+        uninstall_integration(&ctx, IntegrationTarget::Grok, true).unwrap();
+        assert!(!layout.files[0].path.exists());
+        assert!(!config_path.exists());
+        fs::remove_dir_all(home).ok();
     }
 
     #[test]

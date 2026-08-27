@@ -6,7 +6,7 @@ use herdr_support::{
     IntegrationContext, IntegrationInstallOutcome, IntegrationTarget, IntegrationUninstallOutcome,
 };
 
-use super::registry::{integration_target_label, integration_target_supported};
+use super::registry::integration_target_label;
 use super::version::{agent_version_requirement, enforce_agent_version};
 use super::KIMI_MIN_VERSION;
 
@@ -30,13 +30,6 @@ fn install_target_inner(
     target: crate::api::schema::IntegrationTarget,
     force: bool,
 ) -> io::Result<Vec<String>> {
-    if !integration_target_supported(target) {
-        return Err(io::Error::other(format!(
-            "{} integration is not supported on Windows",
-            integration_target_label(target)
-        )));
-    }
-
     let version_warning = match agent_version_requirement(target) {
         Some(requirement) => enforce_agent_version(&requirement)?,
         None => None,
@@ -71,11 +64,11 @@ pub(crate) fn uninstall_target_with(
     Ok(messages)
 }
 
-fn host<'a>(changes: &'a [HostConfigChange], role: HostConfigRole) -> Option<&'a HostConfigChange> {
+fn host(changes: &[HostConfigChange], role: HostConfigRole) -> Option<&HostConfigChange> {
     changes.iter().find(|change| change.role == role)
 }
 
-fn asset<'a>(outcome_paths: &'a [std::path::PathBuf], index: usize) -> &'a Path {
+fn asset(outcome_paths: &[std::path::PathBuf], index: usize) -> &Path {
     outcome_paths
         .get(index)
         .map(Path::new)

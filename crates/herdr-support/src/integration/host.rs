@@ -1074,7 +1074,7 @@ fn grok_status(path: &Path, hook_path: &Path) -> IntegrationFileStatus {
     if value == expected {
         current(path)
     } else if value.get("hooks").is_some() {
-        outdated(path)
+        modified(path)
     } else {
         unowned(path)
     }
@@ -1256,6 +1256,10 @@ fn missing(path: &Path) -> IntegrationFileStatus {
 
 fn outdated(path: &Path) -> IntegrationFileStatus {
     status(path, IntegrationFileState::Outdated)
+}
+
+fn modified(path: &Path) -> IntegrationFileStatus {
+    status(path, IntegrationFileState::Modified)
 }
 
 fn unowned(path: &Path) -> IntegrationFileStatus {

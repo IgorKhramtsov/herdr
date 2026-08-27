@@ -22,43 +22,7 @@ pub(crate) fn integration_target_command_names(
     herdr_support::integration_spec(target).command_names
 }
 
-pub(crate) fn integration_target_supported(target: crate::api::schema::IntegrationTarget) -> bool {
-    #[cfg(windows)]
-    {
-        matches!(
-            target,
-            crate::api::schema::IntegrationTarget::Pi
-                | crate::api::schema::IntegrationTarget::Omp
-                | crate::api::schema::IntegrationTarget::Claude
-                | crate::api::schema::IntegrationTarget::Codex
-                | crate::api::schema::IntegrationTarget::Copilot
-                | crate::api::schema::IntegrationTarget::Opencode
-                | crate::api::schema::IntegrationTarget::Kilo
-                | crate::api::schema::IntegrationTarget::Droid
-                | crate::api::schema::IntegrationTarget::Kimi
-                | crate::api::schema::IntegrationTarget::Qodercli
-                | crate::api::schema::IntegrationTarget::Qwen
-                | crate::api::schema::IntegrationTarget::AntigravityCli
-                | crate::api::schema::IntegrationTarget::Devin
-                | crate::api::schema::IntegrationTarget::Hermes
-                | crate::api::schema::IntegrationTarget::Cursor
-                | crate::api::schema::IntegrationTarget::Mastracode
-                | crate::api::schema::IntegrationTarget::Grok
-        )
-    }
-
-    #[cfg(not(windows))]
-    {
-        let _ = target;
-        true
-    }
-}
-
 pub(crate) fn integration_target_available(target: crate::api::schema::IntegrationTarget) -> bool {
-    if !integration_target_supported(target) {
-        return false;
-    }
-
     integration_target_command_names(target)
         .iter()
         .any(|command| command_available(command))
@@ -198,7 +162,6 @@ pub(crate) fn installed_integration_statuses() -> Vec<super::IntegrationStatus> 
     };
     herdr_support::integration_statuses(&ctx)
         .into_iter()
-        .filter(|status| integration_target_supported(status.target))
         .map(map_support_status)
         .collect()
 }
@@ -260,39 +223,4 @@ pub(crate) fn print_outdated_update_notice() -> bool {
         integration_update_instructions(&targets).replace('`', "")
     );
     true
-}
-
-pub(crate) fn parse_integration_version(content: &str) -> Option<u32> {
-    herdr_support::parse_integration_version(content)
-}
-
-pub(crate) fn integration_status_at(
-    target: crate::api::schema::IntegrationTarget,
-    path: PathBuf,
-    expected_version: u32,
-) -> super::IntegrationStatus {
-    let Ok(ctx) = IntegrationContext::from_env() else {
-        return super::IntegrationStatus {
-            target,
-            path,
-            state: super::IntegrationStatusKind::NotInstalled,
-            installed_version: None,
-            expected_version,
-        };
-    };
-    match herdr_support::integration_status(&ctx, target) {
-        Ok(status) => {
-            let mut mapped = map_support_status(status);
-            mapped.path = path;
-            mapped.expected_version = expected_version;
-            mapped
-        }
-        Err(_) => super::IntegrationStatus {
-            target,
-            path,
-            state: super::IntegrationStatusKind::NotInstalled,
-            installed_version: None,
-            expected_version,
-        },
-    }
 }

@@ -1,4 +1,5 @@
 use std::{
+    cmp::Ordering,
     collections::BTreeSet,
     fs,
     io::{Read, Write},
@@ -11,9 +12,7 @@ use serde::Deserialize;
 
 use super::{agent_label, parse_agent_label, Agent};
 
-pub(crate) use herdr_support::{
-    AgentRemoteStatus, ManifestUpdateStatus, ManifestVersion, MANIFEST_ENGINE_VERSION,
-};
+pub(crate) use herdr_support::{AgentRemoteStatus, ManifestUpdateStatus, ManifestVersion};
 
 const DEFAULT_CATALOG_URL: &str = "https://herdr.dev/agent-detection/index.toml";
 const CATALOG_URL_ENV: &str = "HERDR_AGENT_DETECTION_MANIFEST_CATALOG_URL";

@@ -1,6 +1,7 @@
 pub use herdr_support::{
     agent_label, full_lifecycle_hook_authority, interactive_agent_executable, parse_agent_label,
-    session_identity_only_integration, Agent, AgentDetection, AgentState,
+    parse_canonical_agent_label, session_identity_only_integration, Agent, AgentDetection,
+    AgentState,
 };
 
 pub mod manifest_update;
@@ -23,24 +24,6 @@ pub mod manifest {
     pub fn reload_manifests_for_agents(agents: &[super::Agent]) {
         super::bind_manifest_roots();
         herdr_support::manifest::reload_manifests_for_agents(agents);
-    }
-
-    pub fn manifest_summaries() -> Vec<herdr_support::manifest::AgentManifestSummary> {
-        super::bind_manifest_roots();
-        herdr_support::manifest::manifest_summaries()
-    }
-
-    pub fn detect(agent: super::Agent, screen_content: &str) -> herdr_support::AgentDetection {
-        super::bind_manifest_roots();
-        herdr_support::manifest::detect(agent, screen_content)
-    }
-
-    pub fn detect_with_osc(
-        agent: super::Agent,
-        input: herdr_support::DetectionInput<'_>,
-    ) -> herdr_support::AgentDetection {
-        super::bind_manifest_roots();
-        herdr_support::manifest::detect_with_osc(agent, input)
     }
 
     pub fn explain(
@@ -66,28 +49,15 @@ pub mod manifest {
         super::bind_manifest_roots();
         herdr_support::manifest::explain_for_label(agent_label, screen_content)
     }
-
-    pub fn should_skip_state_update(agent: super::Agent, screen_content: &str) -> bool {
-        super::bind_manifest_roots();
-        herdr_support::manifest::should_skip_state_update(agent, screen_content)
-    }
 }
 
+#[cfg(windows)]
 pub fn identify_agent(process_name: &str) -> Option<Agent> {
     herdr_support::identify_agent_process(process_name)
 }
 
 pub fn identify_agent_in_job(job: &crate::platform::ForegroundJob) -> Option<(Agent, String)> {
     herdr_support::identify_agent_in_job(job)
-}
-
-#[cfg(test)]
-pub fn detect_state(agent: Option<Agent>, screen_content: &str) -> herdr_support::AgentState {
-    detect_agent(agent, screen_content).state
-}
-
-pub fn detect_agent(agent: Option<Agent>, screen_content: &str) -> AgentDetection {
-    detect_agent_with_osc(agent, screen_content, "", "")
 }
 
 pub fn detect_agent_with_osc(
@@ -128,6 +98,7 @@ pub fn foreground_process_group_id(child_pid: u32) -> Option<u32> {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
     use super::*;
 
     #[cfg(target_os = "linux")]

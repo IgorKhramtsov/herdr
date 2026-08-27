@@ -1,9 +1,7 @@
-use super::command::*;
-use super::config_edit::*;
+use super::adapters::*;
 use super::env::*;
 use super::file_ops::*;
 use super::registry::*;
-use super::targets::*;
 use super::types::*;
 use super::version::*;
 use super::*;
@@ -2262,7 +2260,7 @@ fn opencode_status_requires_the_tui_plugin_and_config_entry() {
     fs::remove_file(&installed.tui_plugin_path).unwrap();
     assert_eq!(status(), IntegrationStatusKind::Outdated);
     fs::write(&installed.tui_plugin_path, OPENCODE_TUI_PLUGIN_ASSET).unwrap();
-    super::opencode_config::remove_tui_plugin(&opencode_dir, OPENCODE_TUI_PLUGIN_SPEC).unwrap();
+    fs::write(opencode_dir.join("tui.jsonc"), "{}\n").unwrap();
     assert_eq!(status(), IntegrationStatusKind::Outdated);
 
     std::env::remove_var("HOME");

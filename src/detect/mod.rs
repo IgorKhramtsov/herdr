@@ -31,6 +31,7 @@ pub mod manifest {
         herdr_support::manifest::manifest_summaries()
     }
 
+    #[cfg(test)]
     pub fn explain(
         agent: super::Agent,
         screen_content: &str,

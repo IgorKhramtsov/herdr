@@ -2,13 +2,14 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=mastracode
-# HERDR_INTEGRATION_VERSION=2
+# HERDR_INTEGRATION_VERSION=3
 
 param([string]$Action = "")
 
 if ($Action -notin @("session", "working", "idle", "blocked")) { exit 0 }
 if ($env:HERDR_ENV -ne "1") { exit 0 }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { exit 0 }
+$paneId = if (-not [string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { $env:HERDR_PANE_ID } else { $env:TMUX_PANE }
+if ([string]::IsNullOrWhiteSpace($paneId)) { exit 0 }
 
 $inputText = [Console]::In.ReadToEnd()
 try {
@@ -23,9 +24,9 @@ $herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else
 try {
     if ($Action -eq "session") {
         if ([string]::IsNullOrWhiteSpace($sessionId)) { exit 0 }
-        & $herdr pane report-agent-session $env:HERDR_PANE_ID --source herdr:mastracode --agent mastracode --seq $seq --session-start-source startup --agent-session-id $sessionId 2>$null | Out-Null
+        & $herdr pane report-agent-session $paneId --source herdr:mastracode --agent mastracode --seq $seq --session-start-source startup --agent-session-id $sessionId 2>$null | Out-Null
     } else {
-        $args = @("pane", "report-agent", $env:HERDR_PANE_ID, "--source", "herdr:mastracode", "--agent", "mastracode", "--state", $Action, "--seq", "$seq")
+        $args = @("pane", "report-agent", $paneId, "--source", "herdr:mastracode", "--agent", "mastracode", "--state", $Action, "--seq", "$seq")
         if (-not [string]::IsNullOrWhiteSpace($sessionId)) {
             $args += @("--agent-session-id", $sessionId)
         }

@@ -1,6 +1,6 @@
 # managed by herdr; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=cursor
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 param([string]$Action = "")
 
@@ -11,7 +11,8 @@ function Exit-Hook {
 
 if ($Action -ne "session") { Exit-Hook }
 if ($env:HERDR_ENV -ne "1") { Exit-Hook }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { Exit-Hook }
+$paneId = if (-not [string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { $env:HERDR_PANE_ID } else { $env:TMUX_PANE }
+if ([string]::IsNullOrWhiteSpace($paneId)) { Exit-Hook }
 
 $inputText = [Console]::In.ReadToEnd()
 $jsonStart = $inputText.IndexOf("{")
@@ -41,7 +42,7 @@ if ([string]::IsNullOrWhiteSpace($sessionId)) { Exit-Hook }
 $seq = [DateTime]::UtcNow.Ticks
 $herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
 try {
-    & $herdr pane report-agent-session $env:HERDR_PANE_ID --source herdr:cursor --agent cursor --seq $seq --agent-session-id $sessionId 2>$null | Out-Null
+    & $herdr pane report-agent-session $paneId --source herdr:cursor --agent cursor --seq $seq --agent-session-id $sessionId 2>$null | Out-Null
 } catch {
 }
 

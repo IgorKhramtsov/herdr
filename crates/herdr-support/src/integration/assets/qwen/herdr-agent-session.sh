@@ -1,11 +1,11 @@
 #!/bin/sh
 # managed by herdr; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=qwen
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 [ "${1:-}" = "session" ] || exit 0
 [ "${HERDR_ENV:-}" = "1" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ -n "${HERDR_PANE_ID:-${TMUX_PANE:-}}" ] || exit 0
 [ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
 if [ -n "${HERDR_BIN_PATH:-}" ]; then
     [ -x "$HERDR_BIN_PATH" ] || exit 0
@@ -29,7 +29,7 @@ try:
         raise ValueError
     command = os.environ.get("HERDR_BIN_PATH") or "herdr"
     args = [
-        command, "pane", "report-agent-session", os.environ["HERDR_PANE_ID"],
+        command, "pane", "report-agent-session", (os.environ.get("HERDR_PANE_ID") or os.environ.get("TMUX_PANE")),
         "--source", "herdr:qwen", "--agent", "qwen",
         "--agent-session-id", session_id, "--seq", str(time.time_ns()),
     ]

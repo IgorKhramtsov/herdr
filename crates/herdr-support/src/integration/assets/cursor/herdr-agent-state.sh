@@ -1,12 +1,12 @@
 #!/bin/sh
 # managed by herdr; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=cursor
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 [ "${1:-}" = "session" ] || exit 0
 [ "${HERDR_ENV:-}" = "1" ] || exit 0
 [ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ -n "${HERDR_PANE_ID:-${TMUX_PANE:-}}" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
 python3 -c '
@@ -41,7 +41,7 @@ request = json.dumps({
     "id": f"herdr:cursor:{seq}",
     "method": "pane.report_agent_session",
     "params": {
-        "pane_id": os.environ["HERDR_PANE_ID"],
+        "pane_id": (os.environ.get("HERDR_PANE_ID") or os.environ.get("TMUX_PANE")),
         "source": "herdr:cursor",
         "agent": "cursor",
         "seq": seq,

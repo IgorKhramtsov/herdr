@@ -1,8 +1,8 @@
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use super::env::*;
+use herdr_support::{IntegrationContext, IntegrationFileState};
 
 pub(crate) fn integration_target_label(
     target: crate::api::schema::IntegrationTarget,
@@ -172,36 +172,48 @@ pub(crate) fn hermes_install_layout_available() -> bool {
     }
 }
 
+fn map_file_state(state: IntegrationFileState) -> super::IntegrationStatusKind {
+    match state {
+        IntegrationFileState::Missing => super::IntegrationStatusKind::NotInstalled,
+        IntegrationFileState::Current => super::IntegrationStatusKind::Current,
+        IntegrationFileState::Outdated => super::IntegrationStatusKind::Outdated,
+        IntegrationFileState::Modified => super::IntegrationStatusKind::Modified,
+        IntegrationFileState::Unowned => super::IntegrationStatusKind::Unowned,
+    }
+}
+
+fn map_support_status(status: herdr_support::IntegrationStatus) -> super::IntegrationStatus {
+    super::IntegrationStatus {
+        target: status.target,
+        path: status.path,
+        state: map_file_state(status.state),
+        installed_version: status.installed_version,
+        expected_version: status.expected_version,
+    }
+}
+
 pub(crate) fn installed_integration_statuses() -> Vec<super::IntegrationStatus> {
-    integration_specs()
+    let Ok(ctx) = IntegrationContext::from_env() else {
+        return Vec::new();
+    };
+    herdr_support::integration_statuses(&ctx)
         .into_iter()
-        .filter_map(|(target, path, expected_version)| {
-            if !integration_target_supported(target) {
-                return None;
-            }
-            Some(integration_status_at(target, path.ok()?, expected_version))
-        })
+        .filter(|status| integration_target_supported(status.target))
+        .map(map_support_status)
         .collect()
 }
 
 pub(crate) fn integration_recommendations() -> Vec<super::IntegrationRecommendation> {
-    integration_specs()
+    installed_integration_statuses()
         .into_iter()
-        .filter_map(|(target, path, expected_version)| {
-            if !integration_target_supported(target) {
-                return None;
-            }
-            let path = path.ok()?;
-            let status = integration_status_at(target, path.clone(), expected_version);
-            Some(super::IntegrationRecommendation {
-                target,
-                label: integration_target_label(target),
-                command: integration_target_command(target),
-                available: integration_target_available(target)
-                    || status.state != super::IntegrationStatusKind::NotInstalled,
-                path,
-                state: status.state,
-            })
+        .map(|status| super::IntegrationRecommendation {
+            target: status.target,
+            label: integration_target_label(status.target),
+            command: integration_target_command(status.target),
+            available: integration_target_available(status.target)
+                || status.state != super::IntegrationStatusKind::NotInstalled,
+            path: status.path,
+            state: status.state,
         })
         .collect()
 }
@@ -211,106 +223,6 @@ pub(crate) fn outdated_installed_integrations() -> Vec<super::IntegrationStatus>
         .into_iter()
         .filter(|status| status.state == super::IntegrationStatusKind::Outdated)
         .collect()
-}
-
-fn integration_specs() -> [(
-    crate::api::schema::IntegrationTarget,
-    io::Result<PathBuf>,
-    u32,
-); 17] {
-    [
-        (
-            crate::api::schema::IntegrationTarget::Pi,
-            pi_extension_dir().map(|dir| dir.join(super::PI_EXTENSION_INSTALL_NAME)),
-            super::PI_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Omp,
-            omp_extension_dir().map(|dir| dir.join(super::OMP_EXTENSION_INSTALL_NAME)),
-            super::OMP_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Claude,
-            claude_dir().map(|dir| dir.join("hooks").join(super::CLAUDE_HOOK_INSTALL_NAME)),
-            super::CLAUDE_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Codex,
-            codex_dir().map(|dir| dir.join(super::CODEX_HOOK_INSTALL_NAME)),
-            super::CODEX_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Copilot,
-            copilot_dir().map(|dir| dir.join("hooks").join(super::COPILOT_HOOK_INSTALL_NAME)),
-            super::COPILOT_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Devin,
-            devin_dir().map(|dir| dir.join(super::DEVIN_HOOK_INSTALL_NAME)),
-            super::DEVIN_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Droid,
-            droid_dir().map(|dir| dir.join("hooks").join(super::DROID_HOOK_INSTALL_NAME)),
-            super::DROID_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Kimi,
-            kimi_dir().map(|dir| dir.join("hooks").join(super::KIMI_HOOK_INSTALL_NAME)),
-            super::KIMI_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Opencode,
-            opencode_dir().map(|dir| {
-                dir.join("plugins")
-                    .join(super::OPENCODE_PLUGIN_INSTALL_NAME)
-            }),
-            super::OPENCODE_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Kilo,
-            kilo_dir().map(|dir| dir.join("plugin").join(super::KILO_PLUGIN_INSTALL_NAME)),
-            super::KILO_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Hermes,
-            hermes_plugin_dir().map(|dir| dir.join(super::HERMES_PLUGIN_INIT_INSTALL_NAME)),
-            super::HERMES_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Qodercli,
-            qodercli_dir().map(|dir| dir.join("hooks").join(super::QODERCLI_HOOK_INSTALL_NAME)),
-            super::QODERCLI_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Qwen,
-            qwen_dir().map(|dir| dir.join("hooks").join(super::QWEN_HOOK_INSTALL_NAME)),
-            super::QWEN_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Cursor,
-            cursor_dir().map(|dir| dir.join(super::CURSOR_HOOK_INSTALL_NAME)),
-            super::CURSOR_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Mastracode,
-            mastracode_dir().map(|dir| dir.join("hooks").join(super::MASTRACODE_HOOK_INSTALL_NAME)),
-            super::MASTRACODE_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::AntigravityCli,
-            antigravity_cli_dir().map(|dir| {
-                dir.join("hooks")
-                    .join(super::ANTIGRAVITY_CLI_HOOK_INSTALL_NAME)
-            }),
-            super::ANTIGRAVITY_CLI_INTEGRATION_VERSION,
-        ),
-        (
-            crate::api::schema::IntegrationTarget::Grok,
-            grok_dir().map(|dir| dir.join("hooks").join(super::GROK_HOOK_INSTALL_NAME)),
-            super::GROK_INTEGRATION_VERSION,
-        ),
-    ]
 }
 
 pub(crate) fn integration_update_instructions(
@@ -350,33 +262,8 @@ pub(crate) fn print_outdated_update_notice() -> bool {
     true
 }
 
-/// Whether the Herdr-owned Grok hook config exactly matches the installed
-/// integration. JSON formatting and object key order do not affect validity.
-fn grok_hook_config_is_valid(hook_path: &Path) -> bool {
-    let Some(hooks_dir) = hook_path.parent() else {
-        return false;
-    };
-    let config_path = hooks_dir.join(super::GROK_HOOK_CONFIG_INSTALL_NAME);
-    fs::read_to_string(config_path)
-        .ok()
-        .and_then(|content| serde_json::from_str::<serde_json::Value>(&content).ok())
-        .is_some_and(|config| config == super::targets::grok_hook_config(hook_path))
-}
-
-fn opencode_tui_integration_is_valid(plugin_path: &Path, expected_version: u32) -> bool {
-    let Some(config_dir) = plugin_path.parent().and_then(Path::parent) else {
-        return false;
-    };
-    let tui_plugin_path = config_dir.join(super::OPENCODE_TUI_PLUGIN_INSTALL_NAME);
-    let tui_plugin_current = fs::read_to_string(tui_plugin_path)
-        .ok()
-        .and_then(|content| parse_integration_version(&content))
-        .is_some_and(|version| version >= expected_version);
-    tui_plugin_current
-        && super::opencode_config::tui_plugin_is_configured(
-            config_dir,
-            super::OPENCODE_TUI_PLUGIN_SPEC,
-        )
+pub(crate) fn parse_integration_version(content: &str) -> Option<u32> {
+    herdr_support::parse_integration_version(content)
 }
 
 pub(crate) fn integration_status_at(
@@ -384,7 +271,7 @@ pub(crate) fn integration_status_at(
     path: PathBuf,
     expected_version: u32,
 ) -> super::IntegrationStatus {
-    if !path.is_file() {
+    let Ok(ctx) = IntegrationContext::from_env() else {
         return super::IntegrationStatus {
             target,
             path,
@@ -392,54 +279,20 @@ pub(crate) fn integration_status_at(
             installed_version: None,
             expected_version,
         };
-    }
-
-    let installed_version = fs::read_to_string(&path)
-        .ok()
-        .and_then(|content| parse_integration_version(&content));
-    let mut state = if installed_version.is_some_and(|version| version >= expected_version) {
-        super::IntegrationStatusKind::Current
-    } else {
-        super::IntegrationStatusKind::Outdated
     };
-
-    // Grok only invokes the hook when the herdr-owned `hooks/herdr.json`
-    // registers it, so a current hook script with a missing or broken config
-    // is a nonfunctional install: report it as outdated so `herdr integration
-    // status` flags it and a reinstall rewrites both files.
-    if target == crate::api::schema::IntegrationTarget::Grok
-        && state == super::IntegrationStatusKind::Current
-        && !grok_hook_config_is_valid(&path)
-    {
-        state = super::IntegrationStatusKind::Outdated;
+    match herdr_support::integration_status(&ctx, target) {
+        Ok(status) => {
+            let mut mapped = map_support_status(status);
+            mapped.path = path;
+            mapped.expected_version = expected_version;
+            mapped
+        }
+        Err(_) => super::IntegrationStatus {
+            target,
+            path,
+            state: super::IntegrationStatusKind::NotInstalled,
+            installed_version: None,
+            expected_version,
+        },
     }
-    if target == crate::api::schema::IntegrationTarget::Opencode
-        && state == super::IntegrationStatusKind::Current
-        && !opencode_tui_integration_is_valid(&path, expected_version)
-    {
-        state = super::IntegrationStatusKind::Outdated;
-    }
-
-    super::IntegrationStatus {
-        target,
-        path,
-        state,
-        installed_version,
-        expected_version,
-    }
-}
-
-pub(crate) fn parse_integration_version(content: &str) -> Option<u32> {
-    content.lines().find_map(|line| {
-        let marker_line = line
-            .trim()
-            .trim_start_matches('/')
-            .trim_start_matches('#')
-            .trim();
-        marker_line
-            .strip_prefix(super::INTEGRATION_VERSION_MARKER)?
-            .trim()
-            .parse()
-            .ok()
-    })
 }

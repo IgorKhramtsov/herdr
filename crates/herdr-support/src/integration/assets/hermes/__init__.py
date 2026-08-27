@@ -1,7 +1,7 @@
 """Hermes plugin installed by Herdr to report resumable session identity."""
 
 # HERDR_INTEGRATION_ID=hermes
-# HERDR_INTEGRATION_VERSION=5
+# HERDR_INTEGRATION_VERSION=6
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ _INTERACTIVE_PLATFORMS = {"cli", "tui", "desktop", "acp"}
 def _pane_id() -> str | None:
     if os.environ.get("HERDR_ENV") != "1":
         return None
-    return os.environ.get("HERDR_PANE_ID", "").strip() or None
+    return (os.environ.get("HERDR_PANE_ID") or os.environ.get("TMUX_PANE") or "").strip() or None
 
 
 def _send_session(session_id: str, start_source: str) -> None:

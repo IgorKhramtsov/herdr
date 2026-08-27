@@ -1,7 +1,7 @@
 #!/bin/sh
 # managed by herdr; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=kimi
-# HERDR_INTEGRATION_VERSION=7
+# HERDR_INTEGRATION_VERSION=8
 
 action="${1:-}"
 case "$action" in
@@ -11,7 +11,7 @@ esac
 
 [ "${HERDR_ENV:-}" = "1" ] || exit 0
 [ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ -n "${HERDR_PANE_ID:-${TMUX_PANE:-}}" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
 python3 -c '
@@ -33,7 +33,7 @@ if not isinstance(session_id, str) or not session_id:
 
 seq = time.time_ns()
 params = {
-    "pane_id": os.environ["HERDR_PANE_ID"],
+    "pane_id": (os.environ.get("HERDR_PANE_ID") or os.environ.get("TMUX_PANE")),
     "source": "herdr:kimi",
     "agent": "kimi",
     "seq": seq,

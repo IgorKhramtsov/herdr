@@ -57,6 +57,10 @@ fn integration_status(args: &[String]) -> std::io::Result<i32> {
             crate::integration::IntegrationStatusKind::Outdated => {
                 format!("outdated ({version} < v{})", status.expected_version)
             }
+            crate::integration::IntegrationStatusKind::Modified => {
+                format!("modified ({version})")
+            }
+            crate::integration::IntegrationStatusKind::Unowned => "unowned".to_string(),
         };
         println!("{target}: {state} ({})", status.path.display());
     }
@@ -65,11 +69,11 @@ fn integration_status(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn integration_install(args: &[String]) -> std::io::Result<i32> {
-    let Some(target) = parse_integration_target(args, "install")? else {
+    let Some((target, force)) = parse_integration_target(args, "install")? else {
         return Ok(2);
     };
 
-    match crate::integration::install_target(target) {
+    match crate::integration::install_target_with(target, force) {
         Ok(messages) => {
             print_integration_messages(messages);
             Ok(0)
@@ -82,11 +86,11 @@ fn integration_install(args: &[String]) -> std::io::Result<i32> {
 }
 
 fn integration_uninstall(args: &[String]) -> std::io::Result<i32> {
-    let Some(target) = parse_integration_target(args, "uninstall")? else {
+    let Some((target, force)) = parse_integration_target(args, "uninstall")? else {
         return Ok(2);
     };
 
-    match crate::integration::uninstall_target(target) {
+    match crate::integration::uninstall_target_with(target, force) {
         Ok(messages) => {
             print_integration_messages(messages);
             Ok(0)
@@ -107,19 +111,27 @@ fn print_integration_messages(messages: Vec<String>) {
 fn parse_integration_target(
     args: &[String],
     action: &str,
-) -> std::io::Result<Option<IntegrationTarget>> {
-    let Some(target) = args.first().map(|arg| arg.as_str()) else {
-        eprintln!(
-            "usage: herdr integration {action} <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|cursor|mastracode|grok>"
-        );
+) -> std::io::Result<Option<(IntegrationTarget, bool)>> {
+    let usage = format!(
+        "usage: herdr integration {action} [--force] <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|cursor|mastracode|antigravity-cli|grok>"
+    );
+    let mut force = false;
+    let mut target = None;
+    for arg in args {
+        if arg == "--force" {
+            force = true;
+            continue;
+        }
+        if target.is_some() {
+            eprintln!("{usage}");
+            return Ok(None);
+        }
+        target = Some(arg.as_str());
+    }
+    let Some(target) = target else {
+        eprintln!("{usage}");
         return Ok(None);
     };
-    if args.len() != 1 {
-        eprintln!(
-            "usage: herdr integration {action} <pi|omp|claude|codex|copilot|devin|droid|kimi|opencode|kilo|hermes|qodercli|qwen|cursor|mastracode|grok>"
-        );
-        return Ok(None);
-    }
 
     let parsed = match target {
         "pi" => IntegrationTarget::Pi,
@@ -148,7 +160,7 @@ fn parse_integration_target(
         }
     };
 
-    Ok(Some(parsed))
+    Ok(Some((parsed, force)))
 }
 
 fn print_integration_help() {
@@ -188,4 +200,6 @@ fn print_integration_help() {
     eprintln!("  herdr integration uninstall antigravity-cli");
     eprintln!("  herdr integration uninstall grok");
     eprintln!("  herdr integration status [--outdated-only]");
+    eprintln!("  herdr integration install <target> [--force]");
+    eprintln!("  herdr integration uninstall <target> [--force]");
 }

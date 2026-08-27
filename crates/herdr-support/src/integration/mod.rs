@@ -1,3 +1,37 @@
+mod claude_settings;
+mod command;
+mod config_edit;
+mod consts;
+mod host;
+mod install;
+mod layout;
+mod opencode_config;
+mod state;
+
+pub use command::{hook_command, mastracode_hook_command, shell_single_quote};
+pub use consts::{
+    ANTIGRAVITY_CLI_HOOK_BLOCK_NAME, ANTIGRAVITY_CLI_HOOK_EVENTS, ANTIGRAVITY_CLI_HOOK_TIMEOUT_SEC,
+    COPILOT_REMOVED_LIFECYCLE_HOOK_EVENTS, DEVIN_HOOK_EVENTS, DEVIN_REMOVED_LIFECYCLE_HOOK_EVENTS,
+    DROID_HOOK_EVENTS, GROK_HOOK_CONFIG_INSTALL_NAME, KIMI_ASK_USER_QUESTION_MATCHER,
+    KIMI_CONFIG_BLOCK_BEGIN, KIMI_CONFIG_BLOCK_END, KIMI_HOOK_EVENTS, KIMI_OTHER_TOOL_MATCHER,
+    MASTRACODE_HOOK_EVENTS, MASTRACODE_HOOK_TIMEOUT_MS, OPENCODE_TUI_PLUGIN_SPEC,
+    QODERCLI_HOOK_EVENTS,
+};
+pub use host::{grok_hook_config, HostConfigChange, HostConfigRole};
+pub use install::{
+    install_integration, integration_status, integration_statuses, parse_integration_id,
+    parse_integration_version, uninstall_integration, IntegrationInstallOutcome, IntegrationStatus,
+    IntegrationUninstallOutcome,
+};
+pub use layout::{
+    integration_layout, integration_root, IntegrationContext, IntegrationEnv, IntegrationLayout,
+    IntegrationLocatedFile, ANTIGRAVITY_CLI_CONFIG_DIR_ENV, CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV,
+    COPILOT_HOME_ENV, CURSOR_CONFIG_DIR_ENV, GROK_CONFIG_DIR_ENV, GROK_HOME_ENV, HERMES_HOME_ENV,
+    HOME_ENV, KIMI_CODE_HOME_ENV, LOCAL_APP_DATA_ENV, PI_CODING_AGENT_DIR_ENV, PI_CONFIG_DIR_ENV,
+    QODER_CONFIG_DIR_ENV, QWEN_HOME_ENV, USER_PROFILE_ENV, XDG_CONFIG_HOME_ENV,
+};
+pub use state::{IntegrationFileState, IntegrationFileStatus};
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,7 +82,9 @@ impl IntegrationTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct IntegrationFile {
     pub install_name: &'static str,
+    pub relative_dir: &'static str,
     pub contents: &'static str,
+    pub executable: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,120 +103,138 @@ pub struct IntegrationAsset {
     pub files: &'static [IntegrationFile],
 }
 
-const fn hook(sh: &'static str, ps1: &'static str) -> IntegrationFile {
+const fn hook(relative_dir: &'static str, sh: &'static str, ps1: &'static str) -> IntegrationFile {
     IntegrationFile {
         install_name: if cfg!(windows) {
             "herdr-agent-state.ps1"
         } else {
             "herdr-agent-state.sh"
         },
+        relative_dir,
         contents: if cfg!(windows) { ps1 } else { sh },
+        executable: true,
     }
 }
 
-const fn session_hook(sh: &'static str, ps1: &'static str) -> IntegrationFile {
+const fn session_hook(
+    relative_dir: &'static str,
+    sh: &'static str,
+    ps1: &'static str,
+) -> IntegrationFile {
     IntegrationFile {
         install_name: if cfg!(windows) {
             "herdr-agent-session.ps1"
         } else {
             "herdr-agent-session.sh"
         },
+        relative_dir,
         contents: if cfg!(windows) { ps1 } else { sh },
+        executable: true,
     }
 }
 
 const PI_FILES: &[IntegrationFile] = &[IntegrationFile {
     install_name: "herdr-agent-state.ts",
+    relative_dir: "extensions",
     contents: include_str!("assets/pi/herdr-agent-state.ts"),
+    executable: false,
 }];
 const PI: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Pi,
     label: "pi",
-    version: 8,
+    version: 9,
     command_names: &["pi"],
     files: PI_FILES,
 };
 
 const OMP_FILES: &[IntegrationFile] = &[IntegrationFile {
     install_name: "herdr-omp-agent-state.ts",
+    relative_dir: "extensions",
     contents: include_str!("assets/omp/herdr-agent-state.ts"),
+    executable: false,
 }];
 const OMP: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Omp,
     label: "omp",
-    version: 9,
+    version: 10,
     command_names: &["omp"],
     files: OMP_FILES,
 };
 
 const CLAUDE_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/claude/herdr-agent-state.sh"),
     include_str!("assets/claude/herdr-agent-state.ps1"),
 )];
 const CLAUDE: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Claude,
     label: "claude",
-    version: 8,
+    version: 9,
     command_names: &["claude"],
     files: CLAUDE_FILES,
 };
 
 const CODEX_FILES: &[IntegrationFile] = &[hook(
+    "",
     include_str!("assets/codex/herdr-agent-state.sh"),
     include_str!("assets/codex/herdr-agent-state.ps1"),
 )];
 const CODEX: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Codex,
     label: "codex",
-    version: 8,
+    version: 9,
     command_names: &["codex"],
     files: CODEX_FILES,
 };
 
 const COPILOT_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/copilot/herdr-agent-state.sh"),
     include_str!("assets/copilot/herdr-agent-state.ps1"),
 )];
 const COPILOT: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Copilot,
     label: "copilot",
-    version: 3,
+    version: 4,
     command_names: &["copilot"],
     files: COPILOT_FILES,
 };
 
 const DEVIN_FILES: &[IntegrationFile] = &[hook(
+    "",
     include_str!("assets/devin/herdr-agent-state.sh"),
     include_str!("assets/devin/herdr-agent-state.ps1"),
 )];
 const DEVIN: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Devin,
     label: "devin",
-    version: 2,
+    version: 3,
     command_names: &["devin"],
     files: DEVIN_FILES,
 };
 
 const DROID_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/droid/herdr-agent-state.sh"),
     include_str!("assets/droid/herdr-agent-state.ps1"),
 )];
 const DROID: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Droid,
     label: "droid",
-    version: 3,
+    version: 4,
     command_names: &["droid"],
     files: DROID_FILES,
 };
 
 const KIMI_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/kimi/herdr-agent-state.sh"),
     include_str!("assets/kimi/herdr-agent-state.ps1"),
 )];
 const KIMI: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Kimi,
     label: "kimi",
-    version: 7,
+    version: 8,
     command_names: &["kimi"],
     files: KIMI_FILES,
 };
@@ -188,29 +242,35 @@ const KIMI: IntegrationSpec = IntegrationSpec {
 const OPENCODE_FILES: &[IntegrationFile] = &[
     IntegrationFile {
         install_name: "herdr-agent-state.js",
+        relative_dir: "plugins",
         contents: include_str!("assets/opencode/herdr-agent-state.js"),
+        executable: false,
     },
     IntegrationFile {
         install_name: "herdr-tui-session.js",
+        relative_dir: "",
         contents: include_str!("assets/opencode/herdr-tui-session.js"),
+        executable: false,
     },
 ];
 const OPENCODE: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Opencode,
     label: "opencode",
-    version: 10,
+    version: 11,
     command_names: &["opencode"],
     files: OPENCODE_FILES,
 };
 
 const KILO_FILES: &[IntegrationFile] = &[IntegrationFile {
     install_name: "herdr-agent-state.js",
+    relative_dir: "plugin",
     contents: include_str!("assets/kilo/herdr-agent-state.js"),
+    executable: false,
 }];
 const KILO: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Kilo,
     label: "kilo",
-    version: 4,
+    version: 5,
     command_names: &["kilo", "kilo-code"],
     files: KILO_FILES,
 };
@@ -218,17 +278,21 @@ const KILO: IntegrationSpec = IntegrationSpec {
 const HERMES_FILES: &[IntegrationFile] = &[
     IntegrationFile {
         install_name: "plugin.yaml",
+        relative_dir: "plugins/herdr-agent-state",
         contents: include_str!("assets/hermes/plugin.yaml"),
+        executable: false,
     },
     IntegrationFile {
         install_name: "__init__.py",
+        relative_dir: "plugins/herdr-agent-state",
         contents: include_str!("assets/hermes/__init__.py"),
+        executable: false,
     },
 ];
 const HERMES: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Hermes,
     label: "hermes",
-    version: 5,
+    version: 6,
     command_names: &["hermes"],
     files: HERMES_FILES,
 };
@@ -239,73 +303,79 @@ const QODERCLI_COMMANDS: &[&str] = &["qodercli", "qoder", "qoderclicn", "qodercn
 const QODERCLI_COMMANDS: &[&str] = &["qodercli"];
 
 const QODERCLI_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/qodercli/herdr-agent-state.sh"),
     include_str!("assets/qodercli/herdr-agent-state.ps1"),
 )];
 const QODERCLI: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Qodercli,
     label: "qodercli",
-    version: 3,
+    version: 4,
     command_names: QODERCLI_COMMANDS,
     files: QODERCLI_FILES,
 };
 
 const QWEN_FILES: &[IntegrationFile] = &[session_hook(
+    "hooks",
     include_str!("assets/qwen/herdr-agent-session.sh"),
     include_str!("assets/qwen/herdr-agent-session.ps1"),
 )];
 const QWEN: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Qwen,
     label: "qwen",
-    version: 1,
+    version: 2,
     command_names: &["qwen"],
     files: QWEN_FILES,
 };
 
 const CURSOR_FILES: &[IntegrationFile] = &[hook(
+    "",
     include_str!("assets/cursor/herdr-agent-state.sh"),
     include_str!("assets/cursor/herdr-agent-state.ps1"),
 )];
 const CURSOR: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Cursor,
     label: "cursor",
-    version: 1,
+    version: 2,
     command_names: &["cursor-agent"],
     files: CURSOR_FILES,
 };
 
 const MASTRACODE_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/mastracode/herdr-agent-state.sh"),
     include_str!("assets/mastracode/herdr-agent-state.ps1"),
 )];
 const MASTRACODE: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Mastracode,
     label: "mastracode",
-    version: 2,
+    version: 3,
     command_names: &["mastracode"],
     files: MASTRACODE_FILES,
 };
 
 const ANTIGRAVITY_CLI_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/antigravity_cli/herdr-agent-state.sh"),
     include_str!("assets/antigravity_cli/herdr-agent-state.ps1"),
 )];
 const ANTIGRAVITY_CLI: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::AntigravityCli,
     label: "antigravity-cli",
-    version: 2,
+    version: 3,
     command_names: &["agy"],
     files: ANTIGRAVITY_CLI_FILES,
 };
 
 const GROK_FILES: &[IntegrationFile] = &[hook(
+    "hooks",
     include_str!("assets/grok/herdr-agent-state.sh"),
     include_str!("assets/grok/herdr-agent-state.ps1"),
 )];
 const GROK: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Grok,
     label: "grok",
-    version: 1,
+    version: 2,
     command_names: &["grok"],
     files: GROK_FILES,
 };

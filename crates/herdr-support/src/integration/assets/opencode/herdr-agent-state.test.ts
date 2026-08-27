@@ -46,6 +46,7 @@ beforeEach(() => {
   process.env.HERDR_ENV = "1";
   process.env.HERDR_SOCKET_PATH = "test.sock";
   process.env.HERDR_PANE_ID = "test:p1";
+  delete process.env.TMUX_PANE;
 });
 
 async function loadPlugin() {
@@ -222,3 +223,19 @@ function requestParam(request: unknown, name: string): unknown {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
+
+test("reports using TMUX_PANE when HERDR_PANE_ID is unset", async () => {
+  delete process.env.HERDR_PANE_ID;
+  process.env.TMUX_PANE = "%tmux";
+  const plugin = await loadPlugin();
+  await plugin.event({
+    event: {
+      type: "session.status",
+      properties: { sessionID: "root-session", status: { type: "busy" } },
+    },
+  });
+  expect(requests).toHaveLength(1);
+  const request = requests[0] as { params?: { pane_id?: string } };
+  expect(request.params?.pane_id).toBe("%tmux");
+});
+

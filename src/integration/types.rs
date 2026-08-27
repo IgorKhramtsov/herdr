@@ -147,6 +147,8 @@ pub(crate) enum IntegrationStatusKind {
     NotInstalled,
     Current,
     Outdated,
+    Modified,
+    Unowned,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -169,6 +171,8 @@ impl IntegrationRecommendation {
         match (self.available, self.state) {
             (_, IntegrationStatusKind::Current) => "installed",
             (_, IntegrationStatusKind::Outdated) => "update available",
+            (_, IntegrationStatusKind::Modified) => "modified",
+            (_, IntegrationStatusKind::Unowned) => "unowned",
             (true, IntegrationStatusKind::NotInstalled) => "available",
             (false, IntegrationStatusKind::NotInstalled) => "not found",
         }

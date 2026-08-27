@@ -1,12 +1,12 @@
 #!/bin/sh
 # managed by herdr; reinstalling the integration replaces this file.
 # HERDR_INTEGRATION_ID=qodercli
-# HERDR_INTEGRATION_VERSION=3
+# HERDR_INTEGRATION_VERSION=4
 
 [ "${1:-}" = "session" ] || exit 0
 [ "${HERDR_ENV:-}" = "1" ] || exit 0
 [ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ -n "${HERDR_PANE_ID:-${TMUX_PANE:-}}" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
 python3 -c '
@@ -24,7 +24,7 @@ try:
     subprocess.run(
         [
             os.environ.get("HERDR_BIN_PATH") or "herdr",
-            "pane", "report-agent-session", os.environ["HERDR_PANE_ID"],
+            "pane", "report-agent-session", (os.environ.get("HERDR_PANE_ID") or os.environ.get("TMUX_PANE")),
             "--source", "herdr:qodercli", "--agent", "qodercli",
             "--agent-session-id", session_id, "--seq", str(time.time_ns()),
         ],

@@ -11,6 +11,7 @@ const originalEnvironment = {
   HERDR_OMP_IDLE_DEBOUNCE_MS: process.env.HERDR_OMP_IDLE_DEBOUNCE_MS,
   HERDR_PANE_ID: process.env.HERDR_PANE_ID,
   HERDR_SOCKET_PATH: process.env.HERDR_SOCKET_PATH,
+  TMUX_PANE: process.env.TMUX_PANE,
 };
 
 let server: Server | undefined;
@@ -146,6 +147,62 @@ for (const socketPlugin of socketPlugins) {
     expect(connectedEndpoint()).toBe(`\\\\.\\pipe\\${markerPath}`);
   });
 }
+
+test("Pi reports using TMUX_PANE when HERDR_PANE_ID is unset", async () => {
+  const requests = await startRecordingServer("pi-tmux-pane");
+  delete process.env.HERDR_PANE_ID;
+  process.env.TMUX_PANE = "%tmux";
+  const { handlers, pi } = createExtensionHarness();
+  const { default: install } = await importFresh("./pi/herdr-agent-state.ts");
+  install(pi);
+  await handlers.get("session_start")?.(
+    { reason: "startup" },
+    {
+      hasUI: true,
+      mode: "tui",
+      isIdle: () => true,
+      sessionManager: {
+        getSessionFile: () => undefined,
+        getSessionId: () => "test-session",
+      },
+    },
+  );
+
+  const deadline = Date.now() + 1_000;
+  while (Date.now() < deadline && requests.length === 0) {
+    await Bun.sleep(5);
+  }
+  expect(requests.length).toBeGreaterThan(0);
+  const request = requests[0];
+  if (!isRecord(request) || !isRecord(request.params)) {
+    throw new Error("expected a pane report");
+  }
+  expect(request.params.pane_id).toBe("%tmux");
+});
+
+test("OpenCode reports using TMUX_PANE when HERDR_PANE_ID is unset", async () => {
+  const requests = await startRecordingServer("opencode-tmux-pane");
+  delete process.env.HERDR_PANE_ID;
+  process.env.TMUX_PANE = "%tmux";
+  const { HerdrAgentStatePlugin } = await importFresh("./opencode/herdr-agent-state.js");
+  const plugin = await HerdrAgentStatePlugin();
+  await plugin.event({
+    event: {
+      type: "session.updated",
+      properties: { sessionID: "opencode-session" },
+    },
+  });
+  const deadline = Date.now() + 1_000;
+  while (Date.now() < deadline && requests.length === 0) {
+    await Bun.sleep(5);
+  }
+  expect(requests.length).toBeGreaterThan(0);
+  const request = requests[0];
+  if (!isRecord(request) || !isRecord(request.params)) {
+    throw new Error("expected a pane report");
+  }
+  expect(request.params.pane_id).toBe("%tmux");
+});
 
 test("OpenCode stays disabled without the Herdr socket environment", async () => {
   process.env.HERDR_ENV = "1";

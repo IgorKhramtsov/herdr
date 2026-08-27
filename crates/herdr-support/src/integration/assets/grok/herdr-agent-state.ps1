@@ -2,13 +2,14 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=grok
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 param([string]$Action = "")
 
 if ($Action -ne "session") { exit 0 }
 if ($env:HERDR_ENV -ne "1") { exit 0 }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { exit 0 }
+$paneId = if (-not [string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { $env:HERDR_PANE_ID } else { $env:TMUX_PANE }
+if ([string]::IsNullOrWhiteSpace($paneId)) { exit 0 }
 
 $inputText = [Console]::In.ReadToEnd()
 try {
@@ -36,6 +37,6 @@ if ([string]::IsNullOrWhiteSpace($sessionId)) { exit 0 }
 $seq = [DateTime]::UtcNow.Ticks
 $herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
 try {
-    & $herdr pane report-agent-session $env:HERDR_PANE_ID --source herdr:grok --agent grok --seq $seq --agent-session-id $sessionId 2>$null | Out-Null
+    & $herdr pane report-agent-session $paneId --source herdr:grok --agent grok --seq $seq --agent-session-id $sessionId 2>$null | Out-Null
 } catch {
 }

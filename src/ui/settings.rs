@@ -336,12 +336,16 @@ fn render_settings_integrations(app: &AppState, frame: &mut Frame, area: Rect) {
         let marker = match item.state {
             crate::integration::IntegrationStatusKind::Current => "✓",
             crate::integration::IntegrationStatusKind::Outdated => "↻",
+            crate::integration::IntegrationStatusKind::Modified => "~",
+            crate::integration::IntegrationStatusKind::Unowned => "?",
             crate::integration::IntegrationStatusKind::NotInstalled if item.available => "+",
             crate::integration::IntegrationStatusKind::NotInstalled => "–",
         };
         let marker_style = match item.state {
             crate::integration::IntegrationStatusKind::Current => Style::default().fg(p.green),
             crate::integration::IntegrationStatusKind::Outdated => Style::default().fg(p.yellow),
+            crate::integration::IntegrationStatusKind::Modified => Style::default().fg(p.yellow),
+            crate::integration::IntegrationStatusKind::Unowned => Style::default().fg(p.overlay0),
             crate::integration::IntegrationStatusKind::NotInstalled if item.available => {
                 Style::default().fg(p.accent)
             }

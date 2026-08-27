@@ -1,10 +1,11 @@
-//! Shared Herdr detection, catalogs, integration assets, and newline-JSON reports.
+//! Shared Herdr detection, catalogs, integration lifecycle, and newline-JSON reports.
 //!
-//! This crate is a pure evidence producer. Callers supply process snapshots,
-//! screen text, and OSC strings they already own. The facade returns process
-//! identity and raw screen confidence fields. It does not apply lifecycle
-//! precedence, report expiry, done/seen presentation, reconnect, or any other
-//! reducer. It has no PTY, TUI, server, persistence, or remote updater.
+//! Detection remains an evidence producer: callers supply process snapshots,
+//! screen text, and OSC strings they already own. Integration install/status/
+//! uninstall owns bundled assets plus host-config registration for each harness.
+//! The crate does not apply lifecycle precedence, report expiry, done/seen
+//! presentation, reconnect, or any other reducer. It has no PTY, TUI, server,
+//! persistence, or remote updater.
 
 mod detect;
 mod integration;
@@ -14,17 +15,31 @@ mod report;
 pub use detect::manifest::DetectionInput;
 pub use detect::{
     agent_label, detect_agent_optional, detect_agent_with_osc, full_lifecycle_hook_authority,
-    identify_agent_in_job, identify_agent_process, interactive_agent_executable,
-    parse_agent_label, parse_canonical_agent_label, session_identity_only_integration,
-    should_skip_state_update, Agent, AgentDetection, AgentState, DetectedAgent,
+    identify_agent_in_job, identify_agent_process, interactive_agent_executable, parse_agent_label,
+    parse_canonical_agent_label, session_identity_only_integration, should_skip_state_update,
+    Agent, AgentDetection, AgentState, DetectedAgent,
 };
 pub use detect::{
     manifest, set_manifest_roots, AgentRemoteStatus, ManifestRoots, ManifestUpdateStatus,
     ManifestVersion, MANIFEST_ENGINE_VERSION,
 };
 pub use integration::{
-    bundled_integration_files, integration_asset, integration_spec, integration_specs,
-    integration_targets, IntegrationAsset, IntegrationFile, IntegrationSpec, IntegrationTarget,
+    bundled_integration_files, grok_hook_config, hook_command, install_integration,
+    integration_asset, integration_layout, integration_root, integration_spec, integration_specs,
+    integration_status, integration_statuses, integration_targets, mastracode_hook_command,
+    parse_integration_id, parse_integration_version, shell_single_quote, uninstall_integration,
+    HostConfigChange, HostConfigRole, IntegrationAsset, IntegrationContext, IntegrationEnv,
+    IntegrationFile, IntegrationFileState, IntegrationFileStatus, IntegrationInstallOutcome,
+    IntegrationLayout, IntegrationLocatedFile, IntegrationSpec, IntegrationStatus,
+    IntegrationTarget, IntegrationUninstallOutcome, ANTIGRAVITY_CLI_CONFIG_DIR_ENV,
+    ANTIGRAVITY_CLI_HOOK_BLOCK_NAME, ANTIGRAVITY_CLI_HOOK_EVENTS, ANTIGRAVITY_CLI_HOOK_TIMEOUT_SEC,
+    CLAUDE_CONFIG_DIR_ENV, CODEX_HOME_ENV, COPILOT_HOME_ENV, COPILOT_REMOVED_LIFECYCLE_HOOK_EVENTS,
+    CURSOR_CONFIG_DIR_ENV, DEVIN_HOOK_EVENTS, DEVIN_REMOVED_LIFECYCLE_HOOK_EVENTS, DROID_HOOK_EVENTS,
+    GROK_CONFIG_DIR_ENV, GROK_HOME_ENV, GROK_HOOK_CONFIG_INSTALL_NAME, HERMES_HOME_ENV, HOME_ENV,
+    KIMI_ASK_USER_QUESTION_MATCHER, KIMI_CODE_HOME_ENV, KIMI_CONFIG_BLOCK_BEGIN, KIMI_CONFIG_BLOCK_END,
+    KIMI_HOOK_EVENTS, KIMI_OTHER_TOOL_MATCHER, LOCAL_APP_DATA_ENV, MASTRACODE_HOOK_EVENTS,
+    MASTRACODE_HOOK_TIMEOUT_MS, OPENCODE_TUI_PLUGIN_SPEC, PI_CODING_AGENT_DIR_ENV, PI_CONFIG_DIR_ENV,
+    QODERCLI_HOOK_EVENTS, QODER_CONFIG_DIR_ENV, QWEN_HOME_ENV, USER_PROFILE_ENV, XDG_CONFIG_HOME_ENV,
 };
 pub use process::{ForegroundJob, ForegroundProcess};
 pub use report::{

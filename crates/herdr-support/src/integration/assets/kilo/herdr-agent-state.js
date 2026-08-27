@@ -2,7 +2,7 @@
 // managed by herdr; reinstalling or updating the integration overwrites this file.
 // add custom hooks/plugins beside this file instead of editing it.
 // HERDR_INTEGRATION_ID=kilo
-// HERDR_INTEGRATION_VERSION=4
+// HERDR_INTEGRATION_VERSION=5
 
 import net from "node:net";
 
@@ -41,7 +41,7 @@ function stateFromSessionStatus(status) {
 }
 
 function request(method, params) {
-  const paneId = process.env.HERDR_PANE_ID;
+  const paneId = process.env.HERDR_PANE_ID || process.env.TMUX_PANE;
   const socketPath = process.env.HERDR_SOCKET_PATH;
 
   if (!paneId || !socketPath) {
@@ -106,7 +106,7 @@ export const HerdrAgentStatePlugin = async () => {
   if (
     process.env.HERDR_ENV !== "1" ||
     !process.env.HERDR_SOCKET_PATH ||
-    !process.env.HERDR_PANE_ID
+    !(process.env.HERDR_PANE_ID || process.env.TMUX_PANE)
   ) {
     return {};
   }

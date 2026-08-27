@@ -2,13 +2,14 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=codex
-# HERDR_INTEGRATION_VERSION=8
+# HERDR_INTEGRATION_VERSION=9
 
 param([string]$Action = "")
 
 if ($Action -ne "session") { exit 0 }
 if ($env:HERDR_ENV -ne "1") { exit 0 }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { exit 0 }
+$paneId = if (-not [string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { $env:HERDR_PANE_ID } else { $env:TMUX_PANE }
+if ([string]::IsNullOrWhiteSpace($paneId)) { exit 0 }
 
 $inputText = [Console]::In.ReadToEnd()
 try {
@@ -30,7 +31,7 @@ try {
     $args = @(
         "pane",
         "report-agent-session",
-        $env:HERDR_PANE_ID,
+        $paneId,
         "--source",
         "herdr:codex",
         "--agent",

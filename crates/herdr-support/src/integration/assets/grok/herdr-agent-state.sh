@@ -3,7 +3,7 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=grok
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 set -eu
 
@@ -19,7 +19,7 @@ esac
 
 [ "${HERDR_ENV:-}" = "1" ] || exit 0
 [ -n "${HERDR_SOCKET_PATH:-}" ] || exit 0
-[ -n "${HERDR_PANE_ID:-}" ] || exit 0
+[ -n "${HERDR_PANE_ID:-${TMUX_PANE:-}}" ] || exit 0
 command -v python3 >/dev/null 2>&1 || exit 0
 
 HERDR_ACTION="$action" HERDR_HOOK_INPUT_FILE="$hook_input_file" python3 - <<'PY'
@@ -30,7 +30,7 @@ import socket
 import time
 
 source = "herdr:grok"
-pane_id = os.environ.get("HERDR_PANE_ID")
+pane_id = os.environ.get("HERDR_PANE_ID") or os.environ.get("TMUX_PANE")
 socket_path = os.environ.get("HERDR_SOCKET_PATH")
 hook_input_file = os.environ.get("HERDR_HOOK_INPUT_FILE")
 

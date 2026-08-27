@@ -2,7 +2,7 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=antigravity_cli
-# HERDR_INTEGRATION_VERSION=2
+# HERDR_INTEGRATION_VERSION=3
 
 # Session-only: this hook reports the Antigravity conversation so Herdr can
 # resume the pane. Lifecycle state comes from Herdr's screen detection.
@@ -18,7 +18,8 @@ function Exit-Hook {
 
 if ($Action -ne "session") { Exit-Hook }
 if ($env:HERDR_ENV -ne "1") { Exit-Hook }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { Exit-Hook }
+$paneId = if (-not [string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { $env:HERDR_PANE_ID } else { $env:TMUX_PANE }
+if ([string]::IsNullOrWhiteSpace($paneId)) { Exit-Hook }
 
 $inputText = [Console]::In.ReadToEnd()
 try {
@@ -38,7 +39,7 @@ try {
     $sessionArgs = @(
         "pane",
         "report-agent-session",
-        $env:HERDR_PANE_ID,
+        $paneId,
         "--source",
         "herdr:antigravity_cli",
         "--agent",

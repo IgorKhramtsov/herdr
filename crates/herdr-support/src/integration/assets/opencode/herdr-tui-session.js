@@ -1,7 +1,7 @@
 // installed by herdr
 // managed by herdr; reinstalling or updating the integration overwrites this file.
 // HERDR_INTEGRATION_ID=opencode-tui
-// HERDR_INTEGRATION_VERSION=10
+// HERDR_INTEGRATION_VERSION=11
 
 import net from "node:net";
 
@@ -11,7 +11,7 @@ const ROUTE_POLL_INTERVAL_MS = 100;
 const SELECTION_RETRY_DELAYS_MS = [100, 400, 1_000];
 
 function requestOnce(sessionID) {
-  const paneId = process.env.HERDR_PANE_ID;
+  const paneId = process.env.HERDR_PANE_ID || process.env.TMUX_PANE;
   const socketPath = process.env.HERDR_SOCKET_PATH;
   if (!paneId || !socketPath) {
     return Promise.resolve();
@@ -56,7 +56,7 @@ export default {
     if (
       process.env.HERDR_ENV !== "1" ||
       !process.env.HERDR_SOCKET_PATH ||
-      !process.env.HERDR_PANE_ID
+      !(process.env.HERDR_PANE_ID || process.env.TMUX_PANE)
     ) {
       return;
     }

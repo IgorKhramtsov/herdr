@@ -2,13 +2,14 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=qwen
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 param([string]$Action = "")
 
 if ($Action -ne "session") { exit 0 }
 if ($env:HERDR_ENV -ne "1") { exit 0 }
-if ([string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { exit 0 }
+$paneId = if (-not [string]::IsNullOrWhiteSpace($env:HERDR_PANE_ID)) { $env:HERDR_PANE_ID } else { $env:TMUX_PANE }
+if ([string]::IsNullOrWhiteSpace($paneId)) { exit 0 }
 if ([string]::IsNullOrWhiteSpace($env:HERDR_SOCKET_PATH)) { exit 0 }
 
 $inputText = [Console]::In.ReadToEnd()
@@ -23,7 +24,7 @@ if ($null -eq $payload -or [string]::IsNullOrWhiteSpace($payload.session_id)) { 
 $seq = [DateTime]::UtcNow.Ticks
 $herdr = if ([string]::IsNullOrWhiteSpace($env:HERDR_BIN_PATH)) { "herdr" } else { $env:HERDR_BIN_PATH }
 $commandArgs = @(
-    "pane", "report-agent-session", $env:HERDR_PANE_ID,
+    "pane", "report-agent-session", $paneId,
     "--source", "herdr:qwen", "--agent", "qwen",
     "--agent-session-id", [string]$payload.session_id,
     "--seq", [string]$seq

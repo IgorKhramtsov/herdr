@@ -7,8 +7,8 @@ use regex::Regex;
 use serde::Deserialize;
 
 use super::{
-    agent_label, manifest_update::ManifestVersion, parse_agent_label, Agent, AgentDetection,
-    AgentState,
+    agent_label, parse_agent_label, roots, status, version::ManifestVersion, Agent, AgentDetection,
+    AgentState, MANIFEST_ENGINE_VERSION,
 };
 
 pub const DEFAULT_KNOWN_AGENT_IDLE_FALLBACK: &str = "default_known_agent_idle_fallback";
@@ -72,16 +72,16 @@ impl ManifestSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct AgentManifestSummary {
-    pub(crate) agent: Agent,
-    pub(crate) active_source: ManifestSource,
-    pub(crate) active_version: Option<String>,
-    pub(crate) cached_remote_version: Option<String>,
-    pub(crate) local_override_shadowing_remote: bool,
-    pub(crate) warning: Option<String>,
+pub struct AgentManifestSummary {
+    pub agent: Agent,
+    pub active_source: ManifestSource,
+    pub active_version: Option<String>,
+    pub cached_remote_version: Option<String>,
+    pub local_override_shadowing_remote: bool,
+    pub warning: Option<String>,
 }
 
-pub(crate) fn manifest_summaries() -> Vec<AgentManifestSummary> {
+pub fn manifest_summaries() -> Vec<AgentManifestSummary> {
     let lock = manifest_cache();
     let guard = match lock.read() {
         Ok(guard) => guard,
@@ -137,7 +137,7 @@ struct ManifestCache {
 
 #[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct AgentManifest {
+pub struct AgentManifest {
     id: String,
     version: Option<ManifestVersion>,
     min_engine_version: Option<u32>,
@@ -269,7 +269,7 @@ const MAX_MATCHERS_PER_GATE: usize = 32;
 const MAX_TOTAL_MATCHERS: usize = 1024;
 const MAX_MATCHER_CHARS: usize = 512;
 
-pub(crate) fn reload_manifests() -> Vec<AgentManifestSummary> {
+pub fn reload_manifests() -> Vec<AgentManifestSummary> {
     let _reload_guard = MANIFEST_RELOAD_LOCK
         .get_or_init(|| Mutex::new(()))
         .lock()
@@ -284,7 +284,7 @@ pub(crate) fn reload_manifests() -> Vec<AgentManifestSummary> {
     summaries
 }
 
-pub(crate) fn reload_manifests_for_agents(agents: &[Agent]) {
+pub fn reload_manifests_for_agents(agents: &[Agent]) {
     if agents.is_empty() {
         return;
     }
@@ -751,7 +751,7 @@ fn read_override_manifest(path: &Path) -> Result<AgentManifest, String> {
 }
 
 fn read_remote_manifest(agent: Agent, bundled: &AgentManifest) -> Option<LoadedManifest> {
-    let path = super::manifest_update::remote_manifest_path(agent);
+    let path = roots::remote_manifest_path(agent)?;
     if !path.exists() {
         return None;
     }
@@ -882,18 +882,18 @@ pub fn explain_to_json_value(explain: &DetectionExplain) -> serde_json::Value {
     })
 }
 
-pub(crate) struct ParsedRemoteManifest {
-    pub(crate) manifest: AgentManifest,
-    pub(crate) version: ManifestVersion,
+pub struct ParsedRemoteManifest {
+    pub manifest: AgentManifest,
+    pub version: ManifestVersion,
 }
 
-pub(crate) fn parse_manifest(content: &str) -> Result<AgentManifest, String> {
+pub fn parse_manifest(content: &str) -> Result<AgentManifest, String> {
     let manifest = toml::from_str::<AgentManifest>(content).map_err(|err| err.to_string())?;
     validate_manifest(&manifest)?;
     Ok(manifest)
 }
 
-pub(crate) fn parse_remote_manifest_for_agent(
+pub fn parse_remote_manifest_for_agent(
     agent: Agent,
     content: &str,
 ) -> Result<ParsedRemoteManifest, String> {
@@ -912,10 +912,9 @@ pub(crate) fn parse_remote_manifest_for_agent(
     let min_engine_version = manifest
         .min_engine_version
         .ok_or("remote manifest must include min_engine_version")?;
-    if min_engine_version > super::manifest_update::MANIFEST_ENGINE_VERSION {
+    if min_engine_version > MANIFEST_ENGINE_VERSION {
         return Err(format!(
-            "manifest requires engine {min_engine_version}, current engine is {}",
-            super::manifest_update::MANIFEST_ENGINE_VERSION
+            "manifest requires engine {min_engine_version}, current engine is {MANIFEST_ENGINE_VERSION}"
         ));
     }
     Ok(ParsedRemoteManifest { manifest, version })
@@ -1126,15 +1125,27 @@ fn validate_region_name(spec: &str) -> Result<(), String> {
 }
 
 fn override_path(agent: Agent) -> Option<PathBuf> {
-    Some(
-        crate::config::config_dir()
-            .join("agent-detection")
-            .join(format!("{}.toml", agent_label(agent))),
-    )
+    roots::override_path(agent)
 }
 
-fn remote_update_status(agent: Agent) -> Option<super::manifest_update::AgentRemoteStatus> {
-    super::manifest_update::load_status().agent_status(agent)
+fn remote_update_status(agent: Agent) -> Option<status::AgentRemoteStatus> {
+    status::load_status().agent_status(agent)
+}
+
+pub fn bundled_manifests() -> &'static [(&'static str, &'static str)] {
+    BUNDLED_MANIFESTS
+}
+
+pub fn remote_manifest_path(agent: Agent) -> Option<PathBuf> {
+    roots::remote_manifest_path(agent)
+}
+
+pub fn status_path() -> Option<PathBuf> {
+    roots::status_path()
+}
+
+pub fn load_status() -> status::ManifestUpdateStatus {
+    status::load_status()
 }
 
 fn manifest_matches_agent(manifest: &AgentManifest, agent: Agent) -> bool {

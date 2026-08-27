@@ -680,6 +680,7 @@ dependencies = [
  "clap_complete",
  "crossterm",
  "ctrlc",
+ "herdr-support",
  "interprocess",
  "jsonc-parser",
  "libc",
@@ -701,6 +702,17 @@ dependencies = [
  "widestring",
  "windows-sys",
  "wmi",
+]
+
+[[package]]
+name = "herdr-support"
+version = "0.8.2"
+dependencies = [
+ "regex",
+ "schemars",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]

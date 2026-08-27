@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema, Default)]
-pub struct PingParams {}
+pub use herdr_support::PingParams;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 pub struct ServerLiveHandoffParams {

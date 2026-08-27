@@ -1,0 +1,24 @@
+[package]
+name = "herdr-support"
+version = "0.8.2"
+edition = "2021"
+description = "Shared agent detection, manifests, integration assets, and report schema"
+license = "Apache-2.0"
+repository = "https://github.com/IgorKhramtsov/herdr"
+homepage = "https://herdr.dev"
+include = [
+    "src/**/*",
+    "LICENSE",
+    "Cargo.toml",
+]
+
+[features]
+default = []
+schema = ["dep:schemars"]
+
+[dependencies]
+regex = "1"
+schemars = { version = "1.2.1", features = ["derive"], optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"

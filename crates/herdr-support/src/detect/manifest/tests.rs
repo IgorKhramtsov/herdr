@@ -40,9 +40,7 @@ id = "codex"
 }
 
 fn with_manifest_dirs<T>(name: &str, f: impl FnOnce() -> T) -> T {
-    let _guard = crate::config::test_config_env_lock().lock().unwrap();
-    let old_config = std::env::var_os("XDG_CONFIG_HOME");
-    let old_state = std::env::var_os("XDG_STATE_HOME");
+    let _guard = crate::detect::roots::test_roots_lock();
     let base = std::env::temp_dir().join(format!(
         "herdr-manifest-loader-{name}-{}",
         std::process::id()
@@ -50,32 +48,27 @@ fn with_manifest_dirs<T>(name: &str, f: impl FnOnce() -> T) -> T {
     let config_dir = base.join("config");
     let state_dir = base.join("state");
     let _ = std::fs::remove_dir_all(&base);
-    std::env::set_var("XDG_CONFIG_HOME", &config_dir);
-    std::env::set_var("XDG_STATE_HOME", &state_dir);
+    crate::set_manifest_roots(crate::ManifestRoots {
+        config_dir: Some(config_dir),
+        state_dir: Some(state_dir),
+    });
     reload_manifests();
     let result = f();
-    match old_config {
-        Some(value) => std::env::set_var("XDG_CONFIG_HOME", value),
-        None => std::env::remove_var("XDG_CONFIG_HOME"),
-    }
-    match old_state {
-        Some(value) => std::env::set_var("XDG_STATE_HOME", value),
-        None => std::env::remove_var("XDG_STATE_HOME"),
-    }
+    crate::set_manifest_roots(crate::ManifestRoots::default());
     reload_manifests();
     let _ = std::fs::remove_dir_all(&base);
     result
 }
 
 fn write_remote_codex(content: &str) {
-    let path = crate::detect::manifest_update::remote_manifest_path(Agent::Codex);
+    let path = remote_manifest_path(Agent::Codex).unwrap();
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, content).unwrap();
     reload_manifests();
 }
 
 fn write_remote_codex_without_reload(content: &str) {
-    let path = crate::detect::manifest_update::remote_manifest_path(Agent::Codex);
+    let path = remote_manifest_path(Agent::Codex).unwrap();
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
     std::fs::write(path, content).unwrap();
 }

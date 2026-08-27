@@ -3,20 +3,7 @@
 //! Centralizes OS-dependent behavior behind a clean boundary so core
 //! modules don't scatter `#[cfg]` branches through product logic.
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ForegroundProcess {
-    pub pid: u32,
-    pub name: String,
-    pub argv0: Option<String>,
-    pub argv: Option<Vec<String>>,
-    pub cmdline: Option<String>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ForegroundJob {
-    pub process_group_id: u32,
-    pub processes: Vec<ForegroundProcess>,
-}
+pub use herdr_support::{ForegroundJob, ForegroundProcess};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Signal {

@@ -137,14 +137,7 @@ pub enum ClientWindowTitleReason {
     NoForegroundClient,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum PaneAgentState {
-    Idle,
-    Working,
-    Blocked,
-    Unknown,
-}
+pub use herdr_support::PaneAgentState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "snake_case")]

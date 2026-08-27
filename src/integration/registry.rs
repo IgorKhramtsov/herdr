@@ -7,25 +7,7 @@ use super::env::*;
 pub(crate) fn integration_target_label(
     target: crate::api::schema::IntegrationTarget,
 ) -> &'static str {
-    match target {
-        crate::api::schema::IntegrationTarget::Pi => "pi",
-        crate::api::schema::IntegrationTarget::Omp => "omp",
-        crate::api::schema::IntegrationTarget::Claude => "claude",
-        crate::api::schema::IntegrationTarget::Codex => "codex",
-        crate::api::schema::IntegrationTarget::Copilot => "copilot",
-        crate::api::schema::IntegrationTarget::Devin => "devin",
-        crate::api::schema::IntegrationTarget::Droid => "droid",
-        crate::api::schema::IntegrationTarget::Kimi => "kimi",
-        crate::api::schema::IntegrationTarget::Opencode => "opencode",
-        crate::api::schema::IntegrationTarget::Kilo => "kilo",
-        crate::api::schema::IntegrationTarget::Hermes => "hermes",
-        crate::api::schema::IntegrationTarget::Qodercli => "qodercli",
-        crate::api::schema::IntegrationTarget::Qwen => "qwen",
-        crate::api::schema::IntegrationTarget::Cursor => "cursor",
-        crate::api::schema::IntegrationTarget::Mastracode => "mastracode",
-        crate::api::schema::IntegrationTarget::AntigravityCli => "antigravity-cli",
-        crate::api::schema::IntegrationTarget::Grok => "grok",
-    }
+    herdr_support::integration_spec(target).label
 }
 
 pub(crate) fn integration_target_command(
@@ -37,29 +19,7 @@ pub(crate) fn integration_target_command(
 pub(crate) fn integration_target_command_names(
     target: crate::api::schema::IntegrationTarget,
 ) -> &'static [&'static str] {
-    match target {
-        crate::api::schema::IntegrationTarget::Pi => &["pi"],
-        crate::api::schema::IntegrationTarget::Omp => &["omp"],
-        crate::api::schema::IntegrationTarget::Claude => &["claude"],
-        crate::api::schema::IntegrationTarget::Codex => &["codex"],
-        crate::api::schema::IntegrationTarget::Copilot => &["copilot"],
-        crate::api::schema::IntegrationTarget::Devin => &["devin"],
-        crate::api::schema::IntegrationTarget::Droid => &["droid"],
-        crate::api::schema::IntegrationTarget::Kimi => &["kimi"],
-        crate::api::schema::IntegrationTarget::Opencode => &["opencode"],
-        crate::api::schema::IntegrationTarget::Kilo => &["kilo", "kilo-code"],
-        crate::api::schema::IntegrationTarget::Hermes => &["hermes"],
-        crate::api::schema::IntegrationTarget::Qodercli => qodercli_command_names(),
-        crate::api::schema::IntegrationTarget::Qwen => &["qwen"],
-        crate::api::schema::IntegrationTarget::Cursor => cursor_command_names(),
-        crate::api::schema::IntegrationTarget::Mastracode => &["mastracode"],
-        crate::api::schema::IntegrationTarget::AntigravityCli => &["agy"],
-        crate::api::schema::IntegrationTarget::Grok => &["grok"],
-    }
-}
-
-pub(crate) fn cursor_command_names() -> &'static [&'static str] {
-    &["cursor-agent"]
+    herdr_support::integration_spec(target).command_names
 }
 
 pub(crate) fn integration_target_supported(target: crate::api::schema::IntegrationTarget) -> bool {
@@ -103,16 +63,6 @@ pub(crate) fn integration_target_available(target: crate::api::schema::Integrati
         .iter()
         .any(|command| command_available(command))
         || integration_target_install_layout_available(target)
-}
-
-#[cfg(windows)]
-pub(crate) fn qodercli_command_names() -> &'static [&'static str] {
-    &["qodercli", "qoder", "qoderclicn", "qodercn"]
-}
-
-#[cfg(not(windows))]
-pub(crate) fn qodercli_command_names() -> &'static [&'static str] {
-    &["qodercli"]
 }
 
 pub(crate) fn integration_target_install_layout_available(

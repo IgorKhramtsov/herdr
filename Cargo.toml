@@ -1,3 +1,7 @@
+[workspace]
+members = ["crates/herdr-support"]
+resolver = "2"
+
 [package]
 name = "herdr"
 version = "0.8.2"
@@ -21,6 +25,7 @@ include = [
 ]
 
 [dependencies]
+herdr-support = { path = "crates/herdr-support", features = ["schema"] }
 base64 = "0.22.1"
 bincode = { version = "2", features = ["serde"] }
 bytes = "1"

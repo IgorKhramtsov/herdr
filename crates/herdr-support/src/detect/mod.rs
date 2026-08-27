@@ -25,7 +25,10 @@ pub enum AgentState {
     Unknown,
 }
 
-/// Screen-derived agent state plus confidence metadata used for source arbitration.
+/// Screen-derived agent state plus raw confidence fields.
+///
+/// Callers own collapse with other evidence (lifecycle reports, process
+/// identity, reconnect). These flags do not apply that precedence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AgentDetection {
     pub state: AgentState,
@@ -35,12 +38,9 @@ pub struct AgentDetection {
     /// True when the current screen visibly shows live idle chrome.
     pub visible_idle: bool,
     /// True when the current screen visibly shows live UI chrome that needs
-    /// human input. This is stronger than arbitrary prompt-like text in the
-    /// scrollback and may override a non-blocked integration state.
+    /// human input. Stronger than arbitrary prompt-like text in the scrollback.
     pub visible_blocker: bool,
-    /// True when the current screen visibly shows live working chrome. PTY
-    /// activity is the normal working authority; this remains diagnostic
-    /// metadata and for non-PTY fallback paths.
+    /// True when the current screen visibly shows live working chrome.
     pub visible_working: bool,
 }
 
@@ -316,6 +316,8 @@ pub fn should_skip_state_update(agent: Option<Agent>, screen_content: &str) -> b
     agent.is_some_and(|agent| manifest::should_skip_state_update(agent, screen_content))
 }
 
+/// Catalog fact: this integration source emits full lifecycle state reports.
+/// Does not collapse process, screen, or report evidence.
 pub fn full_lifecycle_hook_authority(source: &str, agent_label: &str) -> bool {
     matches!(
         (source, agent_label),
@@ -328,6 +330,8 @@ pub fn full_lifecycle_hook_authority(source: &str, agent_label: &str) -> bool {
     )
 }
 
+/// Catalog fact: this integration source reports session identity only.
+/// Does not collapse process, screen, or report evidence.
 pub fn session_identity_only_integration(source: &str, agent_label: &str) -> bool {
     matches!(
         (source, agent_label),

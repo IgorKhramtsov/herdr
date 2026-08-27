@@ -1,4 +1,4 @@
-/// One process in a foreground job. Identity only — no PTY or OS handles.
+/// One process in a caller-owned foreground job. Identity only — no PTY or OS handles.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ForegroundProcess {
     pub pid: u32,

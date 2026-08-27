@@ -1,6 +1,10 @@
 //! Shared Herdr detection, catalogs, integration assets, and newline-JSON reports.
 //!
-//! This crate has no PTY, TUI, server, persistence, or remote updater.
+//! This crate is a pure evidence producer. Callers supply process snapshots,
+//! screen text, and OSC strings they already own. The facade returns process
+//! identity and raw screen confidence fields. It does not apply lifecycle
+//! precedence, report expiry, done/seen presentation, reconnect, or any other
+//! reducer. It has no PTY, TUI, server, persistence, or remote updater.
 
 mod detect;
 mod integration;
@@ -10,9 +14,9 @@ mod report;
 pub use detect::manifest::DetectionInput;
 pub use detect::{
     agent_label, detect_agent_optional, detect_agent_with_osc, full_lifecycle_hook_authority,
-    identify_agent_in_job, identify_agent_process, interactive_agent_executable, parse_agent_label,
-    session_identity_only_integration, should_skip_state_update, Agent, AgentDetection, AgentState,
-    DetectedAgent,
+    identify_agent_in_job, identify_agent_process, interactive_agent_executable,
+    parse_agent_label, parse_canonical_agent_label, session_identity_only_integration,
+    should_skip_state_update, Agent, AgentDetection, AgentState, DetectedAgent,
 };
 pub use detect::{
     manifest, set_manifest_roots, AgentRemoteStatus, ManifestRoots, ManifestUpdateStatus,
@@ -72,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn authority_policy_covers_lifecycle_and_session_only_sources() {
+    fn catalog_classifies_lifecycle_and_session_only_sources() {
         assert!(full_lifecycle_hook_authority("herdr:pi", "pi"));
         assert!(full_lifecycle_hook_authority("herdr:omp", "omp"));
         assert!(full_lifecycle_hook_authority(
@@ -118,5 +122,8 @@ mod tests {
         );
         assert_eq!(detection.state, AgentState::Working);
         assert!(detection.visible_working);
+        assert!(!detection.visible_idle);
+        assert!(!detection.visible_blocker);
+        assert!(!detection.skip_state_update);
     }
 }

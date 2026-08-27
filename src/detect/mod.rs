@@ -26,6 +26,11 @@ pub mod manifest {
         herdr_support::manifest::reload_manifests_for_agents(agents);
     }
 
+    pub fn manifest_summaries() -> Vec<herdr_support::manifest::AgentManifestSummary> {
+        super::bind_manifest_roots();
+        herdr_support::manifest::manifest_summaries()
+    }
+
     pub fn explain(
         agent: super::Agent,
         screen_content: &str,

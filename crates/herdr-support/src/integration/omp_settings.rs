@@ -71,9 +71,6 @@ pub(crate) fn uninstall(settings_path: &Path, extension_path: &Path) -> io::Resu
     if !removed {
         return Ok(false);
     }
-    if extensions.elements().is_empty() {
-        property.remove();
-    }
 
     fs::write(settings_path, root.to_string())?;
     Ok(true)
@@ -102,7 +99,13 @@ pub(crate) fn is_configured(settings_path: &Path, extension_path: &Path) -> io::
 }
 
 fn parse_root(content: &str, path: &Path) -> io::Result<CstRootNode> {
-    CstRootNode::parse(content, &jsonc_parse_options()).map_err(|err| {
+    serde_json::from_str::<serde_json::Value>(content).map_err(|err| {
+        io::Error::other(format!(
+            "failed to parse OMP settings at {}: {err}",
+            path.display()
+        ))
+    })?;
+    CstRootNode::parse(content, &json_parse_options()).map_err(|err| {
         io::Error::other(format!(
             "failed to parse OMP settings at {}: {err}",
             path.display()
@@ -137,11 +140,11 @@ fn invalid_extensions(path: &Path) -> io::Error {
     ))
 }
 
-fn jsonc_parse_options() -> ParseOptions {
+fn json_parse_options() -> ParseOptions {
     ParseOptions {
-        allow_comments: true,
+        allow_comments: false,
         allow_loose_object_property_names: false,
-        allow_trailing_commas: true,
+        allow_trailing_commas: false,
         allow_missing_commas: false,
         allow_single_quoted_strings: false,
         allow_hexadecimal_numbers: false,
@@ -169,19 +172,19 @@ mod tests {
     }
 
     #[test]
-    fn install_and_uninstall_preserve_foreign_jsonc() {
+    fn install_and_uninstall_preserve_foreign_json() {
         let dir = unique_dir();
         let settings = dir.join("settings.json");
         let extension = dir.join("extensions/herdr.ts");
         fs::write(
             &settings,
-            "{\n  // retained\n  \"theme\": \"dark\",\n  \"extensions\": [\"/foreign.ts\",],\n}\n",
+            "{\n  \"theme\": \"dark\",\n  \"extensions\": [\"/foreign.ts\"]\n}\n",
         )
         .unwrap();
 
         assert!(install(&settings, &extension).unwrap());
         let installed = fs::read_to_string(&settings).unwrap();
-        assert!(installed.contains("// retained"));
+        assert!(installed.contains("\"theme\": \"dark\""));
         assert!(installed.contains("/foreign.ts"));
         assert!(installed.contains(extension.to_str().unwrap()));
         assert!(is_configured(&settings, &extension).unwrap());
@@ -191,7 +194,7 @@ mod tests {
 
         assert!(uninstall(&settings, &extension).unwrap());
         let uninstalled = fs::read_to_string(&settings).unwrap();
-        assert!(uninstalled.contains("// retained"));
+        assert!(uninstalled.contains("\"theme\": \"dark\""));
         assert!(uninstalled.contains("/foreign.ts"));
         assert!(!uninstalled.contains(extension.to_str().unwrap()));
         assert!(!is_configured(&settings, &extension).unwrap());
@@ -199,16 +202,36 @@ mod tests {
     }
 
     #[test]
-    fn uninstall_removes_empty_extensions_property() {
+    fn uninstall_preserves_preexisting_empty_extensions_property() {
+        let dir = unique_dir();
+        let settings = dir.join("settings.json");
+        let extension = dir.join("herdr.ts");
+        fs::write(&settings, "{\"extensions\": []}\n").unwrap();
+
+        assert!(install(&settings, &extension).unwrap());
+        assert!(uninstall(&settings, &extension).unwrap());
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&settings).unwrap())
+                .unwrap(),
+            serde_json::json!({"extensions": []})
+        );
+        fs::remove_dir_all(dir).ok();
+    }
+
+    #[test]
+    fn invalid_jsonc_is_rejected() {
         let dir = unique_dir();
         let settings = dir.join("settings.json");
         let extension = dir.join("herdr.ts");
 
-        assert!(install(&settings, &extension).unwrap());
-        assert!(uninstall(&settings, &extension).unwrap());
-        assert!(!fs::read_to_string(&settings)
-            .unwrap()
-            .contains(EXTENSIONS_KEY));
+        for content in [
+            "{\n  // unsupported\n  \"extensions\": []\n}\n",
+            "{\"extensions\": [],}\n",
+        ] {
+            fs::write(&settings, content).unwrap();
+            let error = install(&settings, &extension).unwrap_err();
+            assert!(error.to_string().contains("failed to parse OMP settings"));
+        }
         fs::remove_dir_all(dir).ok();
     }
 

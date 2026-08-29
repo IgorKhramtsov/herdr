@@ -21,6 +21,10 @@ struct HookRemoval {
 
 const HOOK_REMOVALS: &[HookRemoval] = &[
     HookRemoval {
+        event: "Notification",
+        actions: &[],
+    },
+    HookRemoval {
         event: "PostToolUse",
         actions: &["working"],
     },
@@ -165,13 +169,10 @@ fn remove_value_event_commands(
             return true;
         };
         let before = command_entries.len();
-        command_entries.retain(|entry| {
-            !commands
-                .iter()
-                .any(|command| is_matching_command_hook(entry, command))
-        });
-        removed |= command_entries.len() != before;
-        !command_entries.is_empty()
+        command_entries.retain(|entry| !is_removed_command_hook(entry, event, commands));
+        let entry_changed = command_entries.len() != before;
+        removed |= entry_changed;
+        !entry_changed || !command_entries.is_empty()
     });
 
     if entries.is_empty() && canonical.is_none() {
@@ -312,18 +313,18 @@ fn remove_event_commands(
             continue;
         };
 
+        let mut entry_changed = false;
         for command_entry in command_entries.elements() {
-            let matches = command_entry.to_serde_value().is_some_and(|value| {
-                commands
-                    .iter()
-                    .any(|command| is_matching_command_hook(&value, command))
-            });
+            let matches = command_entry
+                .to_serde_value()
+                .is_some_and(|value| is_removed_command_hook(&value, event, commands));
             if matches {
                 command_entry.remove();
+                entry_changed = true;
             }
         }
 
-        if command_entries.elements().is_empty() {
+        if entry_changed && command_entries.elements().is_empty() {
             entry.remove();
         }
     }
@@ -341,6 +342,31 @@ fn removal_commands(policy: &HookRemoval, hook_path: &Path) -> Vec<String> {
         .iter()
         .flat_map(|action| hook_command_variants(hook_path, Some(action)))
         .collect()
+}
+
+fn is_removed_command_hook(entry: &Value, event: &str, commands: &[String]) -> bool {
+    commands
+        .iter()
+        .any(|command| is_matching_command_hook(entry, command))
+        || is_legacy_hive_hook(entry, event)
+}
+
+fn is_legacy_hive_hook(entry: &Value, event: &str) -> bool {
+    if entry.get("type").and_then(Value::as_str) != Some("command") {
+        return false;
+    }
+    let Some(command) = entry.get("command").and_then(Value::as_str) else {
+        return false;
+    };
+    let Some((program, action)) = command.rsplit_once(" hook ") else {
+        return false;
+    };
+    if action.trim() != event {
+        return false;
+    }
+    let program = program.trim().trim_matches(['\'', '"']);
+    let executable = program.rsplit(['/', '\\']).next().unwrap_or(program);
+    matches!(executable, "hive" | "hive.exe")
 }
 
 fn canonical_hook_value(hook_path: &Path) -> Value {
@@ -744,6 +770,34 @@ mod tests {
             parsed["hooks"]["PostToolUse"][0]["hooks"][0]["command"],
             "echo keep"
         );
+        assert_eq!(parsed["hooks"]["SessionStart"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn install_removes_obsolete_hive_hooks_and_keeps_foreign_commands() {
+        let (settings_path, hook_path) = paths();
+        let input = r#"{
+  "hooks": {
+    "Notification": [{"hooks": [
+      {"type": "command", "command": "/home/test/.local/bin/hive hook Notification"},
+      {"type": "command", "command": "echo keep"}
+    ]}],
+    "SessionStart": [{"hooks": [
+      {"type": "command", "command": "/home/test/.local/bin/hive hook SessionStart"}
+    ]}],
+    "Stop": [{"hooks": [
+      {"type": "command", "command": "/home/test/.local/bin/hive hook Stop"},
+      {"type": "command", "command": "echo hive hook Stop"}
+    ]}]
+  }
+}"#;
+
+        let updated = install(input, settings_path, hook_path).unwrap();
+
+        assert!(!updated.contains("/home/test/.local/bin/hive hook"));
+        assert!(updated.contains("echo keep"));
+        assert!(updated.contains("echo hive hook Stop"));
+        let parsed: Value = serde_json::from_str(&updated).unwrap();
         assert_eq!(parsed["hooks"]["SessionStart"].as_array().unwrap().len(), 1);
     }
 

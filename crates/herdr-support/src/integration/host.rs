@@ -26,6 +26,10 @@ use super::consts::{
     QWEN_HOOK_EVENTS,
 };
 use super::layout::IntegrationLayout;
+use super::omp_settings::{
+    install as install_omp_settings, is_configured as omp_is_configured,
+    uninstall as uninstall_omp_settings,
+};
 use super::opencode_config::{
     add_tui_plugin, remove_tui_plugin, tui_config_path, tui_plugin_is_configured,
     validate_tui_plugin_config,
@@ -76,7 +80,8 @@ pub fn grok_hook_config(hook_path: &Path) -> Value {
 
 pub(crate) fn host_status(layout: &IntegrationLayout) -> Vec<IntegrationFileStatus> {
     match layout.target {
-        IntegrationTarget::Pi | IntegrationTarget::Omp | IntegrationTarget::Kilo => Vec::new(),
+        IntegrationTarget::Pi | IntegrationTarget::Kilo => Vec::new(),
+        IntegrationTarget::Omp => vec![omp_status(layout)],
         IntegrationTarget::Claude => vec![merge_nested_status(
             &layout.root.join("settings.json"),
             &layout.files[0].path,
@@ -142,9 +147,8 @@ pub(crate) fn host_status(layout: &IntegrationLayout) -> Vec<IntegrationFileStat
 
 pub(crate) fn install_host(layout: &IntegrationLayout) -> io::Result<HostInstallResult> {
     match layout.target {
-        IntegrationTarget::Pi | IntegrationTarget::Omp | IntegrationTarget::Kilo => {
-            Ok(HostInstallResult::default())
-        }
+        IntegrationTarget::Pi | IntegrationTarget::Kilo => Ok(HostInstallResult::default()),
+        IntegrationTarget::Omp => install_omp(layout),
         IntegrationTarget::Claude => install_claude(layout),
         IntegrationTarget::Codex => install_codex(layout),
         IntegrationTarget::Copilot => install_copilot(layout),
@@ -167,10 +171,11 @@ pub(crate) fn uninstall_host(
     force: bool,
 ) -> io::Result<HostInstallResult> {
     match layout.target {
-        IntegrationTarget::Pi | IntegrationTarget::Omp | IntegrationTarget::Kilo => {
+        IntegrationTarget::Pi | IntegrationTarget::Kilo => {
             let _ = force;
             Ok(HostInstallResult::default())
         }
+        IntegrationTarget::Omp => uninstall_omp(layout),
         IntegrationTarget::Claude => uninstall_claude(layout),
         IntegrationTarget::Codex => uninstall_codex(layout),
         IntegrationTarget::Copilot => uninstall_copilot(layout),
@@ -190,6 +195,33 @@ pub(crate) fn uninstall_host(
 
 fn hook_path(layout: &IntegrationLayout) -> &Path {
     &layout.files[0].path
+}
+
+fn omp_status(layout: &IntegrationLayout) -> IntegrationFileStatus {
+    let settings_path = layout.root.join("settings.json");
+    match omp_is_configured(&settings_path, hook_path(layout)) {
+        Ok(true) => current(&settings_path),
+        Ok(false) => missing(&settings_path),
+        Err(_) => unowned(&settings_path),
+    }
+}
+
+fn install_omp(layout: &IntegrationLayout) -> io::Result<HostInstallResult> {
+    let settings_path = layout.root.join("settings.json");
+    let changed = install_omp_settings(&settings_path, hook_path(layout))?;
+    Ok(HostInstallResult {
+        changes: vec![change(settings_path, HostConfigRole::Settings, changed)],
+        extras: Vec::new(),
+    })
+}
+
+fn uninstall_omp(layout: &IntegrationLayout) -> io::Result<HostInstallResult> {
+    let settings_path = layout.root.join("settings.json");
+    let changed = uninstall_omp_settings(&settings_path, hook_path(layout))?;
+    Ok(HostInstallResult {
+        changes: vec![change(settings_path, HostConfigRole::Settings, changed)],
+        extras: Vec::new(),
+    })
 }
 
 fn change(path: PathBuf, role: HostConfigRole, changed: bool) -> HostConfigChange {

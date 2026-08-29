@@ -5,6 +5,7 @@ mod consts;
 mod host;
 mod install;
 mod layout;
+mod omp_settings;
 mod opencode_config;
 mod state;
 
@@ -156,7 +157,7 @@ const OMP_FILES: &[IntegrationFile] = &[IntegrationFile {
 const OMP: IntegrationSpec = IntegrationSpec {
     target: IntegrationTarget::Omp,
     label: "omp",
-    version: 10,
+    version: 11,
     command_names: &["omp"],
     files: OMP_FILES,
 };
